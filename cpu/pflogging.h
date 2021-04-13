@@ -25,7 +25,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfcolor.h"
 
 #define RULELEN 90
-#define UNDERLINE	"\u001b[4m"
 
 inline void REPCH(const char& ch, const size_t& size, const size_t& off = 0) {
     for (size_t i = off; i < size; i++) putc(ch, stdout);
@@ -128,7 +127,7 @@ inline void REPCH(const char& ch, const size_t& size, const size_t& off = 0) {
      size_t gap = (RULELEN - len - 3) / 2; \
      PFLOGN0(" "); \
      REPCH(' ', gap); \
-     fprintf(stdout, "%s%s%s %s%s%s", UNDERLINE, CSOLVER, NAME, CSOLVER, suffix, CNORMAL); \
+     fprintf(stdout, "%s%s%s %s%s%s", CUNDERLINE, CSOLVER, NAME, CSOLVER, suffix, CNORMAL); \
      REPCH(' ', RULELEN + 1, len + gap + 3), fprintf(stdout, "|\n"); \
   } while (0); \
 
