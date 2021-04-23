@@ -17,22 +17,21 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 **********************************************************************************/
 
 #pragma once
-#include <vector>
+#include "pfvec.h"
 
 namespace pFROST {
 	template<class T>
-	class Range : public std::vector<T> {
+	class Range : public Vec<T> {
 	private:
 		void init(T begin, T end, T step) {
-			for (T i = begin; i < end; i += step) {
-				this->push_back(i);
-			}
+			this->reserve((end - begin) / step);
+			for (T i = begin; i < end; i += step) this->push(i);
 		}
 
 	public:
-		Range<T>()							: std::vector<T>() { init(0, 0, 1);  }
-		Range<T>(T end)						: std::vector<T>() { init(0, end, 1); }
-		Range<T>(T begin, T end)			: std::vector<T>() { init(begin, end, 1); }
-		Range<T>(T begin, T end, T step)	: std::vector<T>() { init(begin, end, step); }
+		Range<T>()							: Vec<T>()		{ init(0, 0, 1);  }
+		Range<T>(T end)						: Vec<T>()		{ init(0, end, 1); }
+		Range<T>(T begin, T end)			: Vec<T>()		{ init(begin, end, 1); }
+		Range<T>(T begin, T end, T step)	: Vec<T>()		{ init(begin, end, step); }
 	};
 }

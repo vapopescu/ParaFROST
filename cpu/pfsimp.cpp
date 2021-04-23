@@ -26,8 +26,9 @@ void ParaFROST::createOT(const bool& rst)
 	if (opts.profile_simp) timer.pstart();
 	// reset ot
 	if (rst) {
-		for (uint32 v : Range<uint32>(1, inf.maxVar + 1)) {
-			uint32 p = V2L(v); 
+		Range<uint32> v = Range<uint32>(1, inf.maxVar + 1);
+		for (uint32 i = 0; i < v.size(); i++) {
+			uint32 p = V2L(v[i]); 
 			ot[p].clear(); 
 			ot[NEG(p)].clear();
 		}
