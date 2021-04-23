@@ -116,6 +116,7 @@
     <ClInclude Include="pfqueue.h" />
     <ClInclude Include="pfralloc.h" />
     <ClInclude Include="pfrandom.h" />
+    <ClInclude Include="pfrange.h" />
     <ClInclude Include="pfrestart.h" />
     <ClInclude Include="pfsclause.h" />
     <ClInclude Include="pfsimp.h" />

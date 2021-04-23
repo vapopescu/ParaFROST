@@ -20,7 +20,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define __SIMP_
 
 #include "pfsort.h"
-#include "pfsolve.h" 
+#include "pfsolve.h"
+#include "pfrange.h"
+
 using namespace pFROST;
 
 namespace SIGmA {

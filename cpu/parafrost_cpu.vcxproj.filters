@@ -102,6 +102,9 @@
     <ClInclude Include="pfwatch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="pfrange.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pfanalyze.cpp">
