@@ -44,7 +44,7 @@ namespace pFROST {
 		else if (sz > 2) {
 			SZ i, j;
 			for (i = 1; i < sz; i++) {
-				register T tmp = d[i];
+				T tmp = d[i];
 				for (j = i; j > 0 && cmp(tmp, d[j - 1]); j--)
 					d[j] = d[j - 1];
 				d[j] = tmp;

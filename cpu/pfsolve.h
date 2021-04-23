@@ -373,7 +373,7 @@ namespace pFROST {
 			assert(len > 0);
 			uint32* lit = lits, * end = lits + len;
 			while (lit != end) {
-				register uint32 b = 0;
+				uint32 b = 0;
 				/*if (mapped) b = vmap.revLit(*lit++);
 				else*/ b = *lit++;
 				while (b > 127) { wrProof(Byte(128 | (b & 127))); b >>= 7; }

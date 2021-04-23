@@ -94,7 +94,7 @@ inline int ParaFROST::calcLBD() {
 	int size = learntC.size();
 	if (size > 2) {
 		stats.marker++;
-		register int lbd = 0;
+		int lbd = 0;
 		uint32* end = learntC.end();
 		for (uint32* k = learntC + 1; k != end; k++) {
 			int litLevel = l2dl(*k);
@@ -108,7 +108,7 @@ inline int ParaFROST::calcLBD() {
 }
 
 inline int ParaFROST::calcLBD(const CLAUSE& c) {
-	register int lbd = 0;
+	int lbd = 0;
 	if (c.binary()) lbd = (l2dl(c[0]) != l2dl(c[1])) + 1;
 	else {
 		stats.marker++;

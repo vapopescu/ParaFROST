@@ -126,7 +126,7 @@ namespace SIGmA {
 		assert(c2->original());
 		out_c.clear();
 		int it1 = 0, it2 = 0;
-		register uint32 lit1, lit2, v1, v2;
+		uint32 lit1, lit2, v1, v2;
 		while (it1 < c1->size() && it2 < c2->size()) {
 			lit1 = c1->lit(it1);
 			lit2 = c2->lit(it2);

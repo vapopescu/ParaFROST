@@ -53,7 +53,7 @@ void ParaFROST::minimizeBin()
 
 bool ParaFROST::minimize(const uint32& lit, const int& depth)
 {
-	register uint32 v = ABS(lit);
+	uint32 v = ABS(lit);
 	C_REF r = sp->source[v];
 	if (!sp->level[v] || REMOVABLE(sp->seen[v]) || KEPT(sp->seen[v])) return true;
 	if (DECISION(r) || POISONED(sp->seen[v]) || sp->level[v] == DL()) return false;
