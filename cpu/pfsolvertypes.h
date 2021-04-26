@@ -22,6 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfspace.h"
 #include "pfwatch.h"
 #include "pfsclause.h"
+#include <atomic>
 
 namespace pFROST {
 	/*****************************************************/
@@ -55,19 +56,19 @@ namespace pFROST {
 		LEARN() { memset(this, 0, sizeof(*this)); }
 	};
 	struct STATS {
-		int64 sysMemAvail;
-		int64 n_rephs, n_randrephs;
-		int64 n_subchecks, n_subcalls;
-		int64 n_allsubsumed, n_allstrengthened, n_learntsubs;
-		int64 n_triedreduns, n_orgreduns, n_lrnreduns;
-		int64 n_fuds, n_mds;
-		int64 n_units, n_props, n_forced;
-		int64 tot_lits, max_lits, n_glues;
-		int64 reuses, reduces, recyclings;
-		int64 stab_restarts, ncbt, cbt;
-		int sigmifications;
-		int marker, mdm_calls;
-		int mappings, shrinkages;
+		std::atomic<int64> sysMemAvail;
+		std::atomic<int64> n_rephs, n_randrephs;
+		std::atomic<int64> n_subchecks, n_subcalls;
+		std::atomic<int64> n_allsubsumed, n_allstrengthened, n_learntsubs;
+		std::atomic<int64> n_triedreduns, n_orgreduns, n_lrnreduns;
+		std::atomic<int64> n_fuds, n_mds;
+		std::atomic<int64> n_units, n_props, n_forced;
+		std::atomic<int64> tot_lits, max_lits, n_glues;
+		std::atomic<int64> reuses, reduces, recyclings;
+		std::atomic<int64> stab_restarts, ncbt, cbt;
+		std::atomic<int> sigmifications;
+		std::atomic<int> marker, mdm_calls;
+		std::atomic<int> mappings, shrinkages;
 
 		STATS() { memset(this, 0, sizeof(*this)); }
 	};

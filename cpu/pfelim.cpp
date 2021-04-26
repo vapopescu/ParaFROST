@@ -63,14 +63,15 @@ void ParaFROST::bve()
 	std::mutex mutex;
 
 	workerPool.doWork([&] {
+		Lits_t out_c;
+		out_c.reserve(INIT_CAP);
+
 		while (true) {
 			mutex.lock();
 			uint32 i = ti++;
 			mutex.unlock();
 
 			if (i >= PVs.size()) return;
-			Lits_t out_c;
-			out_c.reserve(INIT_CAP);
 			uint32& v = PVs[i];
 
 			assert(v);
@@ -147,14 +148,26 @@ void ParaFROST::HSE()
 		if (interrupted()) killSolver();
 		PFLOGN2(2, "  Eliminating (self)-subsumptions..");
 		if (opts.profile_simp) timer.pstart();
-		for (uint32 i = 0; i < PVs.size(); i++) {
-			uint32 v = PVs[i];
-			assert(v);
-			assert(sp->vstate[v] == ACTIVE);
-			uint32 p = V2L(v), n = NEG(p);
-			if (ot[p].size() <= opts.hse_limit && ot[n].size() <= opts.hse_limit)
-				self_sub_x(p, ot[p], ot[n]);
-		}
+		uint32 ti = 0;
+		std::mutex mutex;
+
+		workerPool.doWork([&] {
+			while (true) {
+				mutex.lock();
+				uint32 i = ti++;
+				mutex.unlock();
+
+				if (i >= PVs.size()) return;
+				uint32 v = PVs[i];
+				assert(v);
+				assert(sp->vstate[v] == ACTIVE);
+				uint32 p = V2L(v), n = NEG(p);
+				if (ot[p].size() <= opts.hse_limit && ot[n].size() <= opts.hse_limit)
+					self_sub_x(p, ot[p], ot[n]);
+			}
+		});
+
+		workerPool.join();
 		if (opts.profile_simp) timer.pstop(), timer.hse += timer.pcpuTime();
 		PFLDONE(2, 5);
 		PFLREDALL(this, 2, "HSE Reductions");
@@ -167,13 +180,26 @@ void ParaFROST::BCE()
 		if (interrupted()) killSolver();
 		PFLOGN2(2, " Eliminating blocked clauses..");
 		if (opts.profile_simp) timer.pstart();
-		for (uint32 i = 0; i < PVs.size(); i++) {
-			uint32 v = PVs[i];
-			if (!v) continue;
-			uint32 p = V2L(v), n = NEG(p);
-			if (ot[p].size() <= opts.bce_limit && ot[n].size() <= opts.bce_limit)
-				blocked_x(v, ot[p], ot[n]);
-		}
+		uint32 ti = 0;
+		std::mutex mutex;
+
+		workerPool.doWork([&] {
+			while (true) {
+				mutex.lock();
+				uint32 i = ti++;
+				mutex.unlock();
+
+				if (i >= PVs.size()) return;
+				uint32 v = PVs[i];
+				if (!v) continue;
+				uint32 p = V2L(v), n = NEG(p);
+				if (ot[p].size() <= opts.bce_limit && ot[n].size() <= opts.bce_limit)
+					blocked_x(v, ot[p], ot[n]);
+			}
+		});
+
+		workerPool.join();
+		
 		if (opts.profile_simp) timer.pstop(), timer.bce += timer.pcpuTime();
 		PFLDONE(2, 5);
 		PFLREDALL(this, 2, "BCE Reductions");
@@ -186,28 +212,42 @@ void ParaFROST::ERE()
 	if (interrupted()) killSolver();
 	PFLOGN2(2, " Eliminating redundances..");
 	if (opts.profile_simp) timer.pstart();
-	Lits_t m_c;
-	m_c.reserve(INIT_CAP);
-	for (uint32 n = 0; n < PVs.size(); n++) {
-		assert(PVs[n]);
-		uint32 p = V2L(PVs[n]);
-		OL& poss = ot[p], & negs = ot[NEG(p)];
-		if (ot[p].size() <= opts.ere_limit && ot[n].size() <= opts.ere_limit) {
-			// do merging and apply forward equality check (on-the-fly) over resolvents
-			for (int i = 0; i < poss.size(); i++) {
-				if (poss[i]->deleted()) continue;
-				for (int j = 0; j < negs.size(); j++) {
-					if (negs[j]->deleted() || (poss[i]->size() + negs[j]->size() - 2) > MAX_ERE_OUT) continue;
-					if (merge_ere(PVs[n], poss[i], negs[j], m_c)) {
-						CL_ST type;
-						if (poss[i]->learnt() || negs[j]->learnt()) type = LEARNT;
-						else type = ORIGINAL;
-						if (m_c.size() > 1) forward_equ(m_c, ot, type);
+	uint32 ti = 0;
+	std::mutex mutex;
+
+	workerPool.doWork([&] {
+		Lits_t m_c;
+		m_c.reserve(INIT_CAP);
+
+		while (true) {
+			mutex.lock();
+			uint32 n = ti++;
+			mutex.unlock();
+
+			if (n >= PVs.size()) return;
+			assert(PVs[n]);
+			uint32 p = V2L(PVs[n]);
+			OL& poss = ot[p], & negs = ot[NEG(p)];
+
+			if (ot[p].size() <= opts.ere_limit && ot[n].size() <= opts.ere_limit) {
+				// do merging and apply forward equality check (on-the-fly) over resolvents
+				for (int i = 0; i < poss.size(); i++) {
+					if (poss[i]->deleted()) continue;
+					for (int j = 0; j < negs.size(); j++) {
+						if (negs[j]->deleted() || (poss[i]->size() + negs[j]->size() - 2) > MAX_ERE_OUT) continue;
+						if (merge_ere(PVs[n], poss[i], negs[j], m_c)) {
+							CL_ST type;
+							if (poss[i]->learnt() || negs[j]->learnt()) type = LEARNT;
+							else type = ORIGINAL;
+							if (m_c.size() > 1) forward_equ(m_c, ot, type);
+						}
 					}
 				}
 			}
 		}
-	}
+	});
+
+	workerPool.join();
 	if (opts.profile_simp) timer.pstop(), timer.ere += timer.pcpuTime();
 	PFLDONE(2, 5);
 	PFLREDCL(this, 2, "ERE Reductions");
