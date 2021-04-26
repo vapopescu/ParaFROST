@@ -59,21 +59,18 @@ void ParaFROST::bve()
 {
 	if (interrupted()) killSolver();
 	if (opts.profile_simp) timer.pstart();
-	uint32 ti = 0;
+	std::atomic<uint32> ti = 0;
 	std::mutex mutex;
 
 	workerPool.doWork([&] {
 		Lits_t out_c;
 		out_c.reserve(INIT_CAP);
+		uVec1D resolved;
 
 		while (true) {
-			mutex.lock();
 			uint32 i = ti++;
-			mutex.unlock();
-
 			if (i >= PVs.size()) return;
 			uint32& v = PVs[i];
-
 			assert(v);
 			assert(sp->vstate[v] == ACTIVE);
 			uint32 p = V2L(v), n = NEG(p);
@@ -82,7 +79,7 @@ void ParaFROST::bve()
 			countOrgs(poss, pOrgs), countOrgs(negs, nOrgs);
 			// pure-literal
 			if (!pOrgs || !nOrgs) {
-				toblivion(p, pOrgs, nOrgs, poss, negs, model.resolved);
+				toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
 				sp->vstate[v] = MELTED, v = 0;
 			}
 			else {
@@ -91,41 +88,48 @@ void ParaFROST::bve()
 				uint32 def;
 				// Equiv/NOT-gate Reasoning
 				if (def = find_BN_gate(p, poss, negs)) {
-					saveResolved(p, pOrgs, nOrgs, poss, negs, model.resolved);
+					saveResolved(p, pOrgs, nOrgs, poss, negs, resolved);
 					substitute_single(p, def, poss, negs);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// AND-gate Reasoning
 				else if (find_AO_gate(n, pOrgs + nOrgs, ot, out_c)) {
-					toblivion(p, pOrgs, nOrgs, poss, negs, model.resolved);
+					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// OR-gate Reasoning
 				else if (find_AO_gate(p, pOrgs + nOrgs, ot, out_c)) {
-					toblivion(p, pOrgs, nOrgs, poss, negs, model.resolved);
+					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// ITE-gate Reasoning
 				else if (find_ITE_gate(p, pOrgs + nOrgs, ot, out_c)) {
-					toblivion(p, pOrgs, nOrgs, poss, negs, model.resolved);
+					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				else if (find_ITE_gate(n, pOrgs + nOrgs, ot, out_c)) {
-					toblivion(p, pOrgs, nOrgs, poss, negs, model.resolved);
+					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// XOR-gate Reasoning
 				else if (find_XOR_gate(p, pOrgs + nOrgs, ot, out_c)) {
-					toblivion(p, pOrgs, nOrgs, poss, negs, model.resolved);
+					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// n-by-m resolution
 				else if (resolve_x(v, pOrgs, nOrgs, poss, negs, out_c, false)) {
-					toblivion(p, pOrgs, nOrgs, poss, negs, model.resolved);
+					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 			}
 		}
+
+		mutex.lock();
+		model.resolved.reserve(model.resolved.size() + resolved.size());
+		for (int i = 0; i < resolved.size(); i++) {
+			model.resolved.push(resolved[i]);
+		}
+		mutex.unlock();
 	});
 
 	workerPool.join();
@@ -148,15 +152,11 @@ void ParaFROST::HSE()
 		if (interrupted()) killSolver();
 		PFLOGN2(2, "  Eliminating (self)-subsumptions..");
 		if (opts.profile_simp) timer.pstart();
-		uint32 ti = 0;
-		std::mutex mutex;
+		std::atomic<uint32> ti = 0;
 
 		workerPool.doWork([&] {
 			while (true) {
-				mutex.lock();
 				uint32 i = ti++;
-				mutex.unlock();
-
 				if (i >= PVs.size()) return;
 				uint32 v = PVs[i];
 				assert(v);
@@ -180,15 +180,11 @@ void ParaFROST::BCE()
 		if (interrupted()) killSolver();
 		PFLOGN2(2, " Eliminating blocked clauses..");
 		if (opts.profile_simp) timer.pstart();
-		uint32 ti = 0;
-		std::mutex mutex;
+		std::atomic<uint32> ti = 0;
 
 		workerPool.doWork([&] {
 			while (true) {
-				mutex.lock();
 				uint32 i = ti++;
-				mutex.unlock();
-
 				if (i >= PVs.size()) return;
 				uint32 v = PVs[i];
 				if (!v) continue;
@@ -212,18 +208,14 @@ void ParaFROST::ERE()
 	if (interrupted()) killSolver();
 	PFLOGN2(2, " Eliminating redundances..");
 	if (opts.profile_simp) timer.pstart();
-	uint32 ti = 0;
-	std::mutex mutex;
+	std::atomic<uint32> ti = 0;
 
 	workerPool.doWork([&] {
 		Lits_t m_c;
 		m_c.reserve(INIT_CAP);
 
 		while (true) {
-			mutex.lock();
 			uint32 n = ti++;
-			mutex.unlock();
-
 			if (n >= PVs.size()) return;
 			assert(PVs[n]);
 			uint32 p = V2L(PVs[n]);

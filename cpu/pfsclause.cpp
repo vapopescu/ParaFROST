@@ -74,7 +74,7 @@ void ParaFROST::newResolvent(S_REF s)
 		s->set_status(ORIGINAL);
 		s->markAdded();
 		s->calcSig();
-		scnf.pushSafe(s);
+		scnf.pushSafe(s); // TODO push to a per-worker formula, then merge.
 	}
 	if (opts.proof_en) {
 		wrProof('a');

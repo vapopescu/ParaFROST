@@ -22,6 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfsort.h"
 #include "pfsolve.h"
 #include "pfrange.h"
+#include <atomic>
 
 using namespace pFROST;
 
@@ -525,7 +526,7 @@ namespace SIGmA {
 		nAddedCls = pOrgs * nOrgs - nTs;
 	}
 
-	inline void	saveResolved(uVec1D& resolved, const uint32& lit) { resolved.pushSafe(lit), resolved.pushSafe(1); }
+	inline void	saveResolved(uVec1D& resolved, const uint32& lit) { resolved.push(lit), resolved.push(1); }
 
 	inline void	saveResolved(uVec1D& resolved, SCLAUSE& c, const uint32& x)
 	{
@@ -536,11 +537,11 @@ namespace SIGmA {
 			const uint32 lit = c[i];
 			if (lit == x)
 				pos = i;
-			resolved.pushSafe(c[i]);
+			resolved.push(c[i]);
 		}
 		assert(pos >= 0);
 		if (pos) swap(resolved[pos + last], resolved[last]);
-		resolved.pushSafe(c.size());
+		resolved.push(c.size());
 	}
 
 	inline void saveResolved(const uint32& p, const int& pOrgs, const int& nOrgs, OL& poss, OL& negs, uVec1D& resolved)
