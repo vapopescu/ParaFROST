@@ -60,16 +60,18 @@ void ParaFROST::bve()
 	if (interrupted()) killSolver();
 	if (opts.profile_simp) timer.pstart();
 	std::atomic<uint32> ti = 0;
+	int res = 0;
 	std::mutex mutex;
 
 	workerPool.doWork([&] {
 		Lits_t out_c;
 		out_c.reserve(INIT_CAP);
 		uVec1D resolved;
+		SCNF new_res;
 
 		while (true) {
 			uint32 i = ti++;
-			if (i >= PVs.size()) return;
+			if (i >= PVs.size()) break;
 			uint32& v = PVs[i];
 			assert(v);
 			assert(sp->vstate[v] == ACTIVE);
@@ -93,31 +95,31 @@ void ParaFROST::bve()
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// AND-gate Reasoning
-				else if (find_AO_gate(n, pOrgs + nOrgs, ot, out_c)) {
+				else if (find_AO_gate(n, pOrgs + nOrgs, ot, out_c, new_res)) {
 					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// OR-gate Reasoning
-				else if (find_AO_gate(p, pOrgs + nOrgs, ot, out_c)) {
+				else if (find_AO_gate(p, pOrgs + nOrgs, ot, out_c, new_res)) {
 					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// ITE-gate Reasoning
-				else if (find_ITE_gate(p, pOrgs + nOrgs, ot, out_c)) {
+				else if (find_ITE_gate(p, pOrgs + nOrgs, ot, out_c, new_res)) {
 					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
 					sp->vstate[v] = MELTED, v = 0;
 				}
-				else if (find_ITE_gate(n, pOrgs + nOrgs, ot, out_c)) {
+				else if (find_ITE_gate(n, pOrgs + nOrgs, ot, out_c, new_res)) {
 					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// XOR-gate Reasoning
-				else if (find_XOR_gate(p, pOrgs + nOrgs, ot, out_c)) {
+				else if (find_XOR_gate(p, pOrgs + nOrgs, ot, out_c, new_res)) {
 					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// n-by-m resolution
-				else if (resolve_x(v, pOrgs, nOrgs, poss, negs, out_c, false)) {
+				else if (resolve_x(v, pOrgs, nOrgs, poss, negs, out_c, new_res, false)) {
 					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
 					sp->vstate[v] = MELTED, v = 0;
 				}
@@ -128,6 +130,10 @@ void ParaFROST::bve()
 		model.resolved.reserve(model.resolved.size() + resolved.size());
 		for (int i = 0; i < resolved.size(); i++) {
 			model.resolved.push(resolved[i]);
+		}
+		res += new_res.size();
+		for (int i = 0; i < new_res.size(); i++) {
+			newResolvent(new_res[i]);
 		}
 		mutex.unlock();
 	});
@@ -157,7 +163,7 @@ void ParaFROST::HSE()
 		workerPool.doWork([&] {
 			while (true) {
 				uint32 i = ti++;
-				if (i >= PVs.size()) return;
+				if (i >= PVs.size()) break;
 				uint32 v = PVs[i];
 				assert(v);
 				assert(sp->vstate[v] == ACTIVE);
@@ -185,7 +191,7 @@ void ParaFROST::BCE()
 		workerPool.doWork([&] {
 			while (true) {
 				uint32 i = ti++;
-				if (i >= PVs.size()) return;
+				if (i >= PVs.size()) break;
 				uint32 v = PVs[i];
 				if (!v) continue;
 				uint32 p = V2L(v), n = NEG(p);
@@ -216,7 +222,7 @@ void ParaFROST::ERE()
 
 		while (true) {
 			uint32 n = ti++;
-			if (n >= PVs.size()) return;
+			if (n >= PVs.size()) break;
 			assert(PVs[n]);
 			uint32 p = V2L(PVs[n]);
 			OL& poss = ot[p], & negs = ot[NEG(p)];

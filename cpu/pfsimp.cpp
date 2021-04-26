@@ -24,18 +24,15 @@ using namespace SIGmA;
 void ParaFROST::createOT(const bool& rst)
 {
 	if (opts.profile_simp) timer.pstart();
-	size_t batchSize, batchIdx;
-	std::mutex mutex;
+	std::atomic<size_t> batchSize, batchIdx;
 
 	// reset ot
 	if (rst) {
 		batchSize = inf.maxVar / workerPool.count() + 1;
 		batchIdx = 0;
 		workerPool.doWork([&] {
-			mutex.lock();
 			size_t begin = 1 + batchSize * batchIdx++;
-			size_t end = 1 + batchSize * batchIdx;
-			mutex.unlock();
+			size_t end = begin + batchSize;
 			end = std::min(end, (size_t) (inf.maxVar + 1));
 
 			for (size_t i = begin; i < end; i++) {
@@ -51,10 +48,8 @@ void ParaFROST::createOT(const bool& rst)
 	batchSize = (scnf.size() - 1) / workerPool.count() + 1;
 	batchIdx = 0;
 	workerPool.doWork([&] {
-		mutex.lock();
 		size_t begin = batchSize * batchIdx++;
-		size_t end = batchSize * batchIdx;
-		mutex.unlock();
+		size_t end = begin + batchSize;
 		end = std::min(end, scnf.size());
 
 		for (size_t i = begin; i < end; i++) {
@@ -68,8 +63,8 @@ void ParaFROST::createOT(const bool& rst)
 			}
 		}
 	});
+
 	workerPool.join();
-	
 	if (opts.profile_simp) timer.pstop(), timer.cot += timer.pcpuTime();
 }
 

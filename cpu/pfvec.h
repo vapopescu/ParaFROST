@@ -71,7 +71,7 @@ namespace pFROST {
 		__forceinline S			capacity	() const { return cap; }
 		__forceinline void		pop			() { assert(sz > 0); _mem[--sz].~T(); }
 		__forceinline void		insert		(const T& val) { assert(cap > sz);  _mem[sz++] = val; }
-		__forceinline void		push		(const T& val) { if (sz == cap) reserve(sz + 1); new (_mem + sz) T(val); sz++; }
+		__forceinline void		push		(const T& val) { if (sz == cap) reserve(2 * sz + 1); new (_mem + sz) T(val); sz++; }
 		__forceinline void		reserve		(const S& min_cap, const S& size) { reserve(min_cap); sz = size; }
 		__forceinline void		init		(const S& off, const S& n, const T& val) {
 			if (!val && !off) { std::memset(_mem, 0, n * sizeof(T)); }

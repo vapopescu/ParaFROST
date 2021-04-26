@@ -230,7 +230,7 @@ namespace SIGmA {
 		}
 	}
 
-	inline void substitute_x(const uint32& x, OL& poss, OL& negs, Lits_t& out_c)
+	inline void substitute_x(const uint32& x, OL& poss, OL& negs, Lits_t& out_c, SCNF& new_res)
 	{
 		assert(x);
 		out_c.clear();
@@ -242,7 +242,7 @@ namespace SIGmA {
 				if (a != b && !isTautology(x, poss[i], negs[j])) {
 					merge(x, poss[i], negs[j], out_c);
 					S_REF added = new SCLAUSE(out_c);
-					pfrost->newResolvent(added);
+					new_res.push(added);
 #if VE_DBG
 					PFLCLAUSE(1, (*added), " Added ");
 #endif
@@ -639,7 +639,7 @@ namespace SIGmA {
 		}
 	}
 
-	inline bool find_AO_gate(const uint32& dx, const int& nOrgCls, OT& ot, Lits_t& out_c)
+	inline bool find_AO_gate(const uint32& dx, const int& nOrgCls, OT& ot, Lits_t& out_c, SCNF& new_res)
 	{
 		assert(dx > 1);
 		assert(checkMolten(ot[dx], ot[FLIP(dx)]));
@@ -677,7 +677,7 @@ namespace SIGmA {
 					fprintf(stdout, " ) found ==> added = %d, deleted = %d\n", nAddedCls, itarget.size() + otarget.size());
 					printGate(itarget, otarget);
 #endif
-					substitute_x(x, itarget, otarget, out_c);
+					substitute_x(x, itarget, otarget, out_c, new_res);
 					return true;
 				}
 			}
@@ -686,7 +686,7 @@ namespace SIGmA {
 		return false;
 	}
 
-	inline bool find_ITE_gate(const uint32& dx, const int& nOrgCls, OT& ot, Lits_t& out_c)
+	inline bool find_ITE_gate(const uint32& dx, const int& nOrgCls, OT& ot, Lits_t& out_c, SCNF& new_res)
 	{
 		assert(checkMolten(ot[dx], ot[FLIP(dx)]));
 		OL& itarget = ot[dx];
@@ -734,14 +734,14 @@ namespace SIGmA {
 				PFLOG1(" Gate %d = ITE(%d, %d, %d) found ==> added = %d, deleted = %d", l2i(dx), ABS(yi), ABS(zi), ABS(zj), nAddedCls, itarget.size() + otarget.size());
 				printGate(itarget, otarget);
 #endif
-				substitute_x(v, itarget, otarget, out_c);
+				substitute_x(v, itarget, otarget, out_c, new_res);
 				return true;
 			}
 		}
 		return false;
 	}
 
-	inline bool find_XOR_gate(const uint32& dx, const int& nOrgCls, OT& ot, Lits_t& out_c)
+	inline bool find_XOR_gate(const uint32& dx, const int& nOrgCls, OT& ot, Lits_t& out_c, SCNF& new_res)
 	{
 		const uint32 fx = FLIP(dx), v = ABS(dx);
 		assert(checkMolten(ot[dx], ot[fx]));
@@ -782,7 +782,7 @@ namespace SIGmA {
 						printf(" ) found ==> added = %d, deleted = %d\n", nAddedCls, itarget.size() + otarget.size());
 						printGate(itarget, otarget);
 					}
-					substitute_x(v, itarget, otarget, out_c);
+					substitute_x(v, itarget, otarget, out_c, new_res);
 					return true;
 				}
 			} // original block
@@ -790,7 +790,7 @@ namespace SIGmA {
 		return false;
 	}
 
-	inline bool resolve_x(const uint32& x, const int& pOrgs, const int& nOrgs, OL& poss, OL& negs, Lits_t& out_c, const bool& bound)
+	inline bool resolve_x(const uint32& x, const int& pOrgs, const int& nOrgs, OL& poss, OL& negs, Lits_t& out_c, SCNF& new_res, const bool& bound)
 	{
 		assert(x);
 		assert(checkMolten(poss, negs));
@@ -820,7 +820,7 @@ namespace SIGmA {
 				if (!isTautology(x, poss[i], negs[j])) {
 					merge(x, poss[i], negs[j], out_c);
 					S_REF added = new SCLAUSE(out_c);
-					pfrost->newResolvent(added);
+					new_res.push(added);
 #if VE_DBG
 					PFLCLAUSE(1, (*added), " Resolvent ");
 #endif
