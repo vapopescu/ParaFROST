@@ -24,23 +24,21 @@ using namespace SIGmA;
 void ParaFROST::createOT(const bool& rst)
 {
 	if (opts.profile_simp) timer.pstart();
+	size_t batchSize, batchIdx;
+	std::mutex mutex;
+
 	// reset ot
 	if (rst) {
-		unsigned int batchSize = inf.maxVar / workerPool.count() + 1;
-		unsigned int batchIdx = 0;
-		std::mutex mutex;
-
+		batchSize = inf.maxVar / workerPool.count() + 1;
+		batchIdx = 0;
 		workerPool.doWork([&] {
-			unsigned int begin, end;
+			mutex.lock();
+			size_t begin = 1 + batchSize * batchIdx++;
+			size_t end = 1 + batchSize * batchIdx;
+			mutex.unlock();
+			end = std::min(end, (size_t) (inf.maxVar + 1));
 
-			{
-				std::unique_lock<std::mutex> lock(mutex);
-				begin = 1 + batchSize * batchIdx++;
-				end = 1 + batchSize * batchIdx;
-			}
-
-			end = std::min(end, inf.maxVar + 1);
-			for (unsigned int i = begin; i < end; i++) {
+			for (size_t i = begin; i < end; i++) {
 				uint32 p = V2L(i);
 				ot[p].clear();
 				ot[NEG(p)].clear();
@@ -48,17 +46,30 @@ void ParaFROST::createOT(const bool& rst)
 		});
 		workerPool.join();
 	}
+
 	// create ot
-	for (uint32 i = 0; i < scnf.size(); i++) {
-		SCLAUSE& c = *scnf[i];
-		if (c.learnt() || c.original()) {
-			assert(c.size());
-			for (int k = 0; k < c.size(); k++) { 
-				assert(c[k] > 1);
-				ot[c[k]].push(scnf[i]);
+	batchSize = (scnf.size() - 1) / workerPool.count() + 1;
+	batchIdx = 0;
+	workerPool.doWork([&] {
+		mutex.lock();
+		size_t begin = batchSize * batchIdx++;
+		size_t end = batchSize * batchIdx;
+		mutex.unlock();
+		end = std::min(end, scnf.size());
+
+		for (size_t i = begin; i < end; i++) {
+			SCLAUSE& c = *scnf[i];
+			if (c.learnt() || c.original()) {
+				assert(c.size());
+				for (int k = 0; k < c.size(); k++) {
+					assert(c[k] > 1);
+					ot[c[k]].pushSafe(scnf[i]);
+				}
 			}
 		}
-	}
+	});
+	workerPool.join();
+	
 	if (opts.profile_simp) timer.pstop(), timer.cot += timer.pcpuTime();
 }
 

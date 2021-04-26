@@ -25,6 +25,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <cassert>
 #include <typeinfo>
 #include <iostream>
+#include <mutex>
 
 #ifdef __GNUC__
 #define __forceinline __attribute__((always_inline))
@@ -36,6 +37,8 @@ namespace pFROST {
 	class Vec {
 		T* _mem;
 		S sz, cap, maxCap;
+		std::mutex _m;
+
 		bool check(const S& idx) const {
 			if (idx >= sz) {
 				std::cout << "Error - index is out of vector boundary (type: " << typeid(T).name() <<
@@ -131,6 +134,23 @@ namespace pFROST {
 				sz = 0;
 				if (_free) { std::free(_mem); _mem = NULL; cap = 0; }
 			}
+		}
+		__forceinline void		pushSafe(const T& val) { 
+			_m.lock(); 
+			push(val);
+			_m.unlock();
+		}
+		__forceinline T*		popSafe() { 
+			T* retVal = nullptr;
+			_m.lock(); 
+
+			if (!empty()) {
+				retVal = &back();
+				sz--;
+			}
+
+			_m.unlock();
+			return retVal;
 		}
 	};
 	// vector types
