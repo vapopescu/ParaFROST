@@ -26,12 +26,27 @@ void ParaFROST::createOT(const bool& rst)
 	if (opts.profile_simp) timer.pstart();
 	// reset ot
 	if (rst) {
-		Range<uint32> v = Range<uint32>(1, inf.maxVar + 1);
-		for (uint32 i = 0; i < v.size(); i++) {
-			uint32 p = V2L(v[i]); 
-			ot[p].clear(); 
-			ot[NEG(p)].clear();
-		}
+		unsigned int batchSize = inf.maxVar / workerPool.count() + 1;
+		unsigned int batchIdx = 0;
+		std::mutex mutex;
+
+		workerPool.doWork([&] {
+			unsigned int begin, end;
+
+			{
+				std::unique_lock<std::mutex> lock(mutex);
+				begin = 1 + batchSize * batchIdx++;
+				end = 1 + batchSize * batchIdx;
+			}
+
+			end = std::min(end, inf.maxVar + 1);
+			for (unsigned int i = begin; i < end; i++) {
+				uint32 p = V2L(i);
+				ot[p].clear();
+				ot[NEG(p)].clear();
+			}
+		});
+		workerPool.join();
 	}
 	// create ot
 	for (uint32 i = 0; i < scnf.size(); i++) {

@@ -30,6 +30,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfvmap.h"
 #include "pfsolvertypes.h"
 #include "pfoptions.h"
+#include "pfworker.h"
 
 namespace pFROST {
 	/*****************************************************/
@@ -457,12 +458,13 @@ namespace pFROST {
 		//                Simplifier                //
 		//==========================================//
 	protected:
-		uVec1D	PVs;
-		SCNF	scnf;
-		OT		ot;
-		uint32	mu_inc;
-		bool	mapped;
-		int		phase, nForced, sigState;
+		uVec1D		PVs;
+		SCNF		scnf;
+		OT			ot;
+		uint32		mu_inc;
+		bool		mapped;
+		int			phase, nForced, sigState;
+		WorkerPool	workerPool;
 	public:
 		//============= inline methods ==============//
 		inline void		sigmaDelay			();
@@ -579,27 +581,27 @@ namespace pFROST {
 		inline void		bumpShrunken		(S_REF);
 		inline void		depFreeze			(const OL&, const uint32&, const uint32&, const uint32&);
 		//===========================================//
-		void			varReorder			();
-		void			newBeginning		();
-		void			shrinkSimp			();
-		void			sigmify				();
-		bool			LCVE				();
-		bool			prop				();
-		void			bve					();
-		void			VE					();
-		void			HSE					();
-		void			ERE					();
-		void			BCE					();
-		void			sortOT				();
-		void			reduceOT			();
-		void			reduceOL			(OL&);
-		void			extract				(const BCNF&);
-		void			awaken				(const bool& = false);
-		void			createOT			(const bool& = true);
-		bool			propClause			(S_REF, const uint32&);
-		void			strengthen			(S_REF, const uint32&);
-		void			newSClause			(S_REF);
-		void			newResolvent		(S_REF);
+		void	varReorder			();
+		void	newBeginning		();
+		void	shrinkSimp			();
+		void	sigmify				();
+		bool	LCVE				();
+		bool	prop				();
+		void	bve					();
+		void	VE					();
+		void	HSE					();
+		void	ERE					();
+		void	BCE					();
+		void	sortOT				();
+		void	reduceOT			();
+		void	reduceOL			(OL&);
+		void	extract				(const BCNF&);
+		void	awaken				(const bool& = false);
+		void	createOT			(const bool& = true);
+		bool	propClause			(S_REF, const uint32&);
+		void	strengthen			(S_REF, const uint32&);
+		void	newSClause			(S_REF);
+		void	newResolvent		(S_REF);
 		//==========================================//
 		//			       Printers                 //
 		//==========================================//

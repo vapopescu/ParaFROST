@@ -105,6 +105,9 @@
     <ClInclude Include="pfrange.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="pfworker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pfanalyze.cpp">
@@ -180,6 +183,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="pfwatch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pfworker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
