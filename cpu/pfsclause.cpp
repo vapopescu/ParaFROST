@@ -74,7 +74,7 @@ void ParaFROST::newResolvent(S_REF s)
 		s->set_status(ORIGINAL);
 		s->markAdded();
 		s->calcSig();
-		scnf.push(s);
+		scnf.pushSafe(s);
 	}
 	if (opts.proof_en) {
 		wrProof('a');
