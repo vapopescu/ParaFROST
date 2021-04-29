@@ -20,19 +20,25 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using namespace pFROST;
 
-WorkerPool::WorkerPool() {
+WorkerPool::WorkerPool()
+{
 	init(std::thread::hardware_concurrency());
 }
 
-WorkerPool::WorkerPool(unsigned int threads) {
+WorkerPool::WorkerPool(unsigned int threads)
+{
 	init(threads);
 }
 
-WorkerPool::~WorkerPool() {
+WorkerPool::~WorkerPool()
+{
 	destroy();
 }
 
-void WorkerPool::init(unsigned int threads) {
+void WorkerPool::init(unsigned int threads)
+{
+	_workers.clear();
+	_jobQueue.clear();
 	_terminate = false;
 	_waiting = 0;
 	if (threads == 0) threads = 1;
@@ -40,22 +46,19 @@ void WorkerPool::init(unsigned int threads) {
 	for (int i = 0; i < threads; i++) {
 		_workers.emplace_back(std::thread([this] {
 			while (true) {
-				Job job;
-
-				{
-					std::unique_lock<std::mutex> lock(_mutex);
-					std::function<bool()> condition = [this] { return !_jobQueue.empty() || _terminate; };
-					if (!condition()) {
-						_waiting++;
-						_poolCV.notify_one();
-						_workerCV.wait(lock, condition);
-						_waiting--;
-					}
-
-					if (_terminate) return;
-					job = _jobQueue.back();
-					_jobQueue.pop_back();
+				std::unique_lock<std::mutex> lock(_mutex);
+				std::function<bool()> condition = [this] { return !_jobQueue.empty() || _terminate; };
+				if (!condition()) {
+					_waiting++;
+					_poolCV.notify_one();
+					_workerCV.wait(lock, condition);
+					_waiting--;
 				}
+
+				if (_terminate) break;
+				Job job = std::move(_jobQueue.back());
+				_jobQueue.pop_back();
+				lock.unlock();
 
 				job();
 			}
@@ -77,13 +80,14 @@ void WorkerPool::destroy() {
 }
 
 void WorkerPool::doWork(Job job) {
-	std::unique_lock<std::mutex>(_mutex);
+	std::unique_lock<std::mutex> lock(_mutex);
 
 	for (int i = 0; i < _workers.size(); i++) {
 		_jobQueue.push_back(job);
 	}
 
 	_workerCV.notify_all();
+	lock.unlock();
 }
 
 unsigned int WorkerPool::count() {
@@ -94,5 +98,5 @@ void WorkerPool::join() {
 	std::unique_lock<std::mutex> lock(_mutex);
 	std::function<bool()> condition = [this] { return _waiting == _workers.size(); };
 	if (!condition()) _poolCV.wait(lock, condition);
-	return;
+	lock.unlock();
 }

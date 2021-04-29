@@ -31,6 +31,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfsolvertypes.h"
 #include "pfoptions.h"
 #include "pfworker.h"
+#include <atomic>
 
 namespace pFROST {
 	/*****************************************************/
@@ -504,13 +505,19 @@ namespace pFROST {
 			inf.nClauses = inf.n_cls_after;
 		}
 		inline void		countAll			() {
-			inf.n_cls_after = 0;
-			inf.n_lits_after = 0;
-			for (uint32 i = 0; i < scnf.size(); i++)
-				if (scnf[i]->original() || scnf[i]->learnt()) {
-					inf.n_cls_after++;
-					inf.n_lits_after += scnf[i]->size();
+			std::atomic<uint32> ti = 0, c = 0, l = 0;
+			workerPool.doWork([&] {
+				while (true) {
+					uint32 i = ti++;
+					if (i >= scnf.size()) break;
+					if (scnf[i]->original() || scnf[i]->learnt()) {
+						c++;
+						l += scnf[i]->size();
+					}
 				}
+			});
+			inf.n_cls_after = c;
+			inf.n_lits_after = l;
 		}
 		inline void		countCls			() {
 			inf.n_cls_after = 0;
