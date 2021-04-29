@@ -23,6 +23,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfsolve.h"
 #include "pfrange.h"
 #include <atomic>
+#include <mutex>
+#include <condition_variable>
+#include <functional>
 
 using namespace pFROST;
 

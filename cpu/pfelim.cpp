@@ -23,30 +23,75 @@ using namespace SIGmA;
 
 bool ParaFROST::prop()
 {
+	std::mutex m;
+	std::condition_variable cv1, cv2;
+	int working = workerPool.count();
+	bool terminate = false;
+
 	nForced = sp->propagated;
-	while (sp->propagated < trail.size()) { // propagate units
-		uint32 assign = trail[sp->propagated++], f_assign = FLIP(assign);
-		assert(assign > 1);
-		// remove satisfied
-		for (int i = 0; i < ot[assign].size(); i++) ot[assign][i]->markDeleted();
-		// reduce unsatisfied
-		for (int i = 0; i < ot[f_assign].size(); i++) {
-			S_REF c = ot[f_assign][i];
-			//c->print();
-			assert(c->size());
-			if (c->deleted() || propClause(c, f_assign)) continue; // clause satisfied
-			// clause is unit or conflict
-			// Note: attach & strengthen don't check for conflict before enqueue
-			if (c->size() == 0) { cnfstate = UNSAT; return false; }
-			if (c->size() == 1) {
-				assert(**c > 1);
-				if (unassigned(**c)) enqueueOrg(**c);
-				else { cnfstate = UNSAT; return false; }
+	workerPool.doWork([&] {
+		while (true) {
+			std::unique_lock<std::mutex> lock(m);
+			std::function<bool()> condition = [&] { return terminate || cnfstate == UNSAT || sp->propagated == trail.size(); };
+			if (!condition()) {
+				working--;
+				cv2.notify_one();
+				cv1.wait(lock, condition);
+				working++;
 			}
+			if (terminate || cnfstate == UNSAT) break;
+			uint32 assign = trail[sp->propagated++];
+			lock.unlock();
+
+			assert(assign > 1);
+			uint32 f_assign = FLIP(assign);
+			// remove satisfied
+			for (int i = 0; i < ot[assign].size(); i++) ot[assign][i]->markDeleted();
+			// reduce unsatisfied
+			for (int i = 0; i < ot[f_assign].size(); i++) {
+				S_REF c = ot[f_assign][i];
+				//c->print();
+				assert(c->size());
+				if (c->deleted() || propClause(c, f_assign)) continue; // clause satisfied
+				// clause is unit or conflict
+				// Note: attach & strengthen don't check for conflict before enqueue
+				if (c->size() == 0) {
+
+					std::unique_lock<std::mutex> lock(m);
+					cnfstate = UNSAT;
+					working = 0;
+					lock.unlock();
+					break;
+				}
+				if (c->size() == 1) {
+					assert(**c > 1);
+					std::unique_lock<std::mutex> lock(m);
+					if (unassigned(**c)) {
+						enqueueOrg(**c);
+						cv1.notify_one();
+						lock.unlock();
+					}
+					else {
+						cnfstate = UNSAT;
+						working = 0;
+						lock.unlock();
+						break;
+					}
+				}
+			}
+			// delete assign lists
+			ot[assign].clear(true), ot[f_assign].clear(true);
 		}
-		// delete assign lists
-		ot[assign].clear(true), ot[f_assign].clear(true);
-	}
+	});
+
+	std::unique_lock<std::mutex> lock(m);
+	while (working) cv2.wait(lock);
+	terminate = true;
+	cv1.notify_all();
+	lock.unlock();
+
+	workerPool.join();
+	if (cnfstate == UNSAT) return false;
 	nForced = sp->propagated - nForced;
 	if (nForced) {
 		PFLREDALL(this, 2, "BCP Reductions");
@@ -72,7 +117,7 @@ void ParaFROST::bve()
 		while (true) {
 			uint32 i = ti++;
 			if (i >= PVs.size()) break;
-			uint32& v = PVs[i];
+			uint32 v = PVs[i];
 			assert(v);
 			assert(sp->vstate[v] == ACTIVE);
 			uint32 p = V2L(v), n = NEG(p);

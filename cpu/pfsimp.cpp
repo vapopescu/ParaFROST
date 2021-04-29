@@ -48,7 +48,6 @@ void ParaFROST::createOT(const bool& rst)
 	batchSize = (scnf.size() - 1) / workerPool.count() + 1;
 	batchIdx = 0;
 	workerPool.doWork([&] {
-		// TODO: try copy vector
 		size_t begin = batchSize * batchIdx++;
 		size_t end = begin + batchSize;
 		end = std::min(end, scnf.size());
@@ -96,14 +95,20 @@ void ParaFROST::reduceOT()
 void ParaFROST::sortOT()
 {
 	if (opts.profile_simp) timer.pstart();
-	for (uint32 i = 0; i < PVs.size(); i++) {
-		uint32 v = PVs[i];
-		assert(v);
-		uint32 p = V2L(v), n = NEG(p);
-		OL& poss = ot[p], &negs = ot[n];
-		std::sort(poss.data(), poss.data() + poss.size(), CNF_CMP_KEY());
-		std::sort(negs.data(), negs.data() + negs.size(), CNF_CMP_KEY());
-	}
+	std::atomic<uint32> ti = 0;
+	workerPool.doWork([&] {
+		while (true) {
+			uint32 i = ti++;
+			if (i >= PVs.size()) break;
+			uint32 v = PVs[i];
+			assert(v);
+			uint32 p = V2L(v), n = NEG(p);
+			OL& poss = ot[p], & negs = ot[n];
+			std::sort(poss.data(), poss.data() + poss.size(), CNF_CMP_KEY());
+			std::sort(negs.data(), negs.data() + negs.size(), CNF_CMP_KEY());
+		}
+	});
+	workerPool.join();
 	if (opts.profile_simp) timer.pstop(), timer.sot += timer.pcpuTime();
 }
 
