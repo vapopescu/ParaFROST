@@ -32,31 +32,31 @@ namespace pFROST {
 		int _sz, _lbd;
 		CL_ST _st, _f;
 	public:
-						SCLAUSE		() { _lits = NULL, _sz = 0, _sig = 0, _st = 0, _f = 0; }
-						~SCLAUSE	() { clear(true); }
-						SCLAUSE		(const CLAUSE& src) {
-							_sz = src.size(), _st = src.status();
-							if (learnt()) {
-								_lbd = src.lbd();
-								assert(src.usage() <= USAGE_MAX);
-								_f = (src.usage() << USAGE_OFF);
-								assert(usage() == src.usage());
-							}
-							else { _lbd = 0, _f = 0; }
-							_lits = NULL, _sig = 0;
-							_lits = new uint32[_sz];
-							copyLitsFrom(src);
-							assert(!molten());
-							assert(!added());
-							assert(original() || size() == 2 || (learnt() && lbd()));
-						}
-						SCLAUSE		(const Lits_t& src) {
-							_sz = src.size();
-							_lits = NULL, _sig = 0, _st = 0, _f = 0;
-							_lits = new uint32[_sz];
-							copyLitsFrom(src);
-							assert(!_f);
-						}
+		SCLAUSE		() { _lits = NULL, _sz = 0, _sig = 0, _st = 0, _f = 0; }
+		~SCLAUSE	() { clear(true); }
+		SCLAUSE		(const CLAUSE& src) {
+			_sz = src.size(), _st = src.status();
+			if (learnt()) {
+				_lbd = src.lbd();
+				assert(src.usage() <= USAGE_MAX);
+				_f = (src.usage() << USAGE_OFF);
+				assert(usage() == src.usage());
+			}
+			else { _lbd = 0, _f = 0; }
+			_lits = NULL, _sig = 0;
+			_lits = new uint32[_sz];
+			copyLitsFrom(src);
+			assert(!molten());
+			assert(!added());
+			assert(original() || size() == 2 || (learnt() && lbd()));
+		}
+		SCLAUSE		(const Lits_t& src) {
+			_sz = src.size();
+			_lits = NULL, _sig = 0, _st = 0, _f = 0;
+			_lits = new uint32[_sz];
+			copyLitsFrom(src);
+			assert(!_f);
+		}
 		template <class SRC>
 		inline void		copyLitsFrom(const SRC& src) {
 			assert(_sz);

@@ -73,6 +73,8 @@ namespace pFROST {
 		__forceinline void		insert		(const T& val) { assert(cap > sz);  _mem[sz++] = val; }
 		__forceinline void		push		(const T& val) { if (sz == cap) reserve(2 * sz + 1); new (_mem + sz) T(val); sz++; }
 		__forceinline void		reserve		(const S& min_cap, const S& size) { reserve(min_cap); sz = size; }
+		__forceinline void		lock		() { _m.lock(); }
+		__forceinline void		unlock		() { _m.unlock(); }
 		__forceinline void		init		(const S& off, const S& n, const T& val) {
 			if (!val && !off) { std::memset(_mem, 0, n * sizeof(T)); }
 			else { for (S i = off; i < n; i++) _mem[i] = val; }
@@ -134,23 +136,6 @@ namespace pFROST {
 				sz = 0;
 				if (_free) { std::free(_mem); _mem = NULL; cap = 0; }
 			}
-		}
-		__forceinline void		pushSafe(const T& val) { 
-			_m.lock(); 
-			push(val);
-			_m.unlock();
-		}
-		__forceinline T*		popSafe() { 
-			T* retVal = nullptr;
-			_m.lock(); 
-
-			if (!empty()) {
-				retVal = &back();
-				sz--;
-			}
-
-			_m.unlock();
-			return retVal;
 		}
 	};
 	// vector types

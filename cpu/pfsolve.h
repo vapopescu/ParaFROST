@@ -76,6 +76,7 @@ namespace pFROST {
 		bool			intr;
 	public:
 		OPTION			opts;
+		WorkerPool		workerPool;
 		//============== inline methods ===============
 		inline void		strengthen			(CLAUSE&, const uint32&);
 		inline int		removeRooted		(CLAUSE&);
@@ -464,7 +465,6 @@ namespace pFROST {
 		uint32		mu_inc;
 		bool		mapped;
 		int			phase, nForced, sigState;
-		WorkerPool	workerPool;
 	public:
 		//============= inline methods ==============//
 		inline void		sigmaDelay			();

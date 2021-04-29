@@ -70,7 +70,7 @@ namespace pFROST {
 #define LEARNT		(CL_ST)0x02
 #define DELETED		(CL_ST)0x04
 #define ISORG(x)		((x) & ORIGINAL)
-#define POS(x)			((x) & 0xFFFFFFFE)
+#define POS(x)			((x) & ~NEG_SIGN)
 #define ABS(x)			((x) >> 1)
 #define V2L(x)			((x) << 1)
 #define SIGN(x)			((x) & NEG_SIGN)

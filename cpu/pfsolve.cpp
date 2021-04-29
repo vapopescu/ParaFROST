@@ -166,7 +166,7 @@ void ParaFROST::resetSolver() {
 	lrn.mdm_conf_max = int64(scale(opts.mdm_minc));
 	lrn.sigma_conf_max = int64(scale(opts.sigma_inc));
 	lrn.subsume_conf_max = int64(scale(opts.subsume_inc));
-	lrn.stable = opts.stable_en & opts.vsidsonly_en;
+	lrn.stable = opts.stable_en && opts.vsidsonly_en;
 	if (lrn.stable) PFLOG2(2, "  VSIDS with initial stable phasing is enabled");
 	else PFLOG2(2, "  VMFQ with initial unstable phasing is enabled");
 	initVars();

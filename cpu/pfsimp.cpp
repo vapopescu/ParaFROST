@@ -48,6 +48,7 @@ void ParaFROST::createOT(const bool& rst)
 	batchSize = (scnf.size() - 1) / workerPool.count() + 1;
 	batchIdx = 0;
 	workerPool.doWork([&] {
+		// TODO: try copy vector
 		size_t begin = batchSize * batchIdx++;
 		size_t end = begin + batchSize;
 		end = std::min(end, scnf.size());
@@ -58,7 +59,9 @@ void ParaFROST::createOT(const bool& rst)
 				assert(c.size());
 				for (int k = 0; k < c.size(); k++) {
 					assert(c[k] > 1);
-					ot[c[k]].pushSafe(scnf[i]);
+					ot[c[k]].lock();
+					ot[c[k]].push(scnf[i]);
+					ot[c[k]].unlock();
 				}
 			}
 		}
@@ -149,7 +152,7 @@ void ParaFROST::sigmify()
 	/********************************/
 	/*		Getting ready...        */
 	/********************************/
-	if (!opts.phases && !(opts.all_en | opts.ere_en)) return;
+	if (!opts.phases && !(opts.all_en || opts.ere_en)) return;
 	backtrack();
 	if (BCP()) { cnfstate = UNSAT; return; }
 	shrink(orgs), shrink(learnts);

@@ -138,7 +138,7 @@ void OPTION::init() {
 	chrono_en = opt_chrono_en;
 	chronoreuse_en = opt_chronoreuse_en;
 	chrono_min = opt_chrono_min;
-	report_en = opt_report_en & !quiet_en;
+	report_en = opt_report_en && !quiet_en;
 	reduce_en = opt_reduce_en;
 	reduce_perc = opt_reduce_perc;
 	reduce_inc = opt_reduce_inc;
@@ -194,8 +194,8 @@ void OPTION::init() {
 		ve_en = opt_ve_en || ve_plus_en;
 		hse_en = opt_hse_en || ve_plus_en;
 		if (all_en) ve_en = 1, ve_plus_en = 1, bce_en = 1, ere_en = 1;
-		if (!phases && (ve_en | hse_en | bce_en)) phases = 1; // at least 1 phase needed
-		if (phases && !(ve_en | hse_en | bce_en)) phases = 0;
+		if (!phases && (ve_en || hse_en || bce_en)) phases = 1; // at least 1 phase needed
+		if (phases && !(ve_en || hse_en || bce_en)) phases = 0;
 		if (phases > 1 && !ve_en) phases = 1;
 	}
 }

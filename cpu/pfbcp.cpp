@@ -44,12 +44,15 @@ bool ParaFROST::BCP()
 				if (w.binary()) {
 					C_REF r = w.ref;
 					if (cm[r].deleted()) { j--; continue; } 
-					if (!impVal) { conflict = r, noConflict = false; }
+					if (!impVal) { 
+						conflict = r;
+						noConflict = false; 
+						break;
+					}
 					else enqueue(imp, assign_dl, r);
 				}
 				//================ large =================//
 				else {
-					if (!noConflict) break; // binary conflict found
 					C_REF r = w.ref;
 					CLAUSE& c = cm[r];
 					if (c.deleted()) { j--; continue; }
@@ -113,7 +116,8 @@ bool ParaFROST::BCP()
 							assert(!val);
 							assert(!otherVal);
 							PFLCONFLICT(this, 3, other);
-							conflict = r, noConflict = false;
+							conflict = r;
+							noConflict = false;
 							break;
 						}
 					}
