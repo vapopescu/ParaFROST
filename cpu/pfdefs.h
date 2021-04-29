@@ -33,6 +33,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <cstdlib>
 #include <csignal>
 #include <random>
+#include <atomic>
 #include "pflogging.h"
 #include "pfdtypes.h"
 #include "pfconst.h"
@@ -63,7 +64,7 @@ namespace pFROST {
 	//===================================================//
 	//       Global Data structures primitives           //
 	//===================================================//
-	struct OCCUR { uint32 ps, ns; };
+	struct OCCUR { std::atomic<uint32> ps, ns; };
 	struct CNF_INFO {
 		uint32 orgVars, maxVar, maxFrozen, maxMelted, nDualVars, n_del_vars_after;
 		uint32 nOrgCls, nOrgLits, n_cls_after, n_lits_after;

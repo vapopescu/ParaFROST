@@ -38,7 +38,7 @@ void ParaFROST::varReorder()
 		PFLOG0(" Eligible variables:");
 		for (uint32 i = 0; i < eligible.size(); i++) {
 			uint32 v = eligible[i];
-			PFLOG1("  e[%d]->(v: %d, p: %d, n: %d, s: %d)", i, v, occurs[v].ps, occurs[v].ns, scores[v]);
+			PFLOG1("  e[%d]->(v: %d, p: %d, n: %d, s: %d)", i, v, (uint32)occurs[v].ps, (uint32)occurs[v].ns, scores[v]);
 		}
 	}
 }

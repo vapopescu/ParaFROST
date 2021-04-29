@@ -362,7 +362,10 @@ namespace pFROST {
 		}
 		inline void		hist				(const BCNF& cnf, const bool& rst = false) {
 			if (cnf.empty()) return;
-			if (rst) for (uint32 i = 0; i < occurs.size(); i++) occurs[i] = { 0 , 0 };
+			if (rst) for (uint32 i = 0; i < occurs.size(); i++) { 
+				occurs[i].ps = 0; 
+				occurs[i].ns = 0;
+			}
 			for (uint32 i = 0; i < cnf.size(); i++) hist(cm[cnf[i]]);
 			assert(occurs[0].ps == 0 && occurs[0].ns == 0);
 		}
@@ -509,7 +512,7 @@ namespace pFROST {
 			std::atomic<uint32> c = 0, l = 0;
 
 			batchIndex = 0;
-			batchSize = scnf.size() / workerPool.count();
+			batchSize = (scnf.size() - 1) / workerPool.count() + 1;
 
 			workerPool.doWork([&] {
 				uint32 ct = 0, lt = 0;
@@ -584,17 +587,43 @@ namespace pFROST {
 		}
 		inline void		histSimp			(const SCNF& cnf, const bool& rst = false) {
 			if (cnf.empty()) return;
-			if (rst) for (uint32 i = 0; i < occurs.size(); i++) occurs[i] = { 0 , 0 };
-			for (uint32 i = 0; i < cnf.size(); i++) histSimp(cnf[i]);
-			assert(occurs[0].ps == 0 && occurs[0].ns == 0);
-		}
-		inline void		histSimp			(const S_REF& c) {
-			if (c->deleted()) return;
-			for (int i = 0; i < c->size(); i++) {
-				assert((*c)[i] > 1);
-				if (SIGN((*c)[i])) occurs[ABS((*c)[i])].ns++;
-				else occurs[ABS((*c)[i])].ps++;
+			std::atomic<uint32> batchIndex, batchSize;
+
+			if (rst) {
+				batchIndex = 0;
+				batchSize = (occurs.size() - 1) / workerPool.count() + 1;
+				workerPool.doWork([&] {
+					uint32 begin = batchSize * batchIndex++;
+					uint32 end = std::min(begin + batchSize, (uint32)occurs.size());
+
+					for (uint32 i = begin; i < end; i++) {
+						occurs[i].ps = 0;
+						occurs[i].ns = 0;
+					};
+				});
+				workerPool.join();
 			}
+
+			batchIndex = 0;
+			batchSize = (cnf.size() - 1) / workerPool.count() + 1;
+			workerPool.doWork([&] {
+				uint32 begin = batchSize * batchIndex++;
+				uint32 end = std::min(begin + batchSize, (uint32)cnf.size());
+				
+				for (uint32 i = begin; i < end; i++) {
+					S_REF c = cnf[i];
+					if (c->deleted()) return;
+					for (int j = 0; j < c->size(); j++) {
+						uint32 lit = (*c)[j];
+						assert(lit > 1);
+						if (SIGN(lit)) occurs[ABS(lit)].ns++;
+						else occurs[ABS(lit)].ps++;
+					}
+				}
+			});
+			workerPool.join();
+
+			assert(occurs[0].ps == 0 && occurs[0].ns == 0);
 		}
 		inline void		removeClause		(S_REF& c) { assert(c != NULL); delete c; c = NULL; }
 		inline void		bumpShrunken		(S_REF);
