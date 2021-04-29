@@ -505,16 +505,26 @@ namespace pFROST {
 			inf.nClauses = inf.n_cls_after;
 		}
 		inline void		countAll			() {
-			std::atomic<uint32> ti = 0, c = 0, l = 0;
+			std::atomic<uint32> batchIndex, batchSize;
+			std::atomic<uint32> c = 0, l = 0;
+
+			batchIndex = 0;
+			batchSize = scnf.size() / workerPool.count();
+
 			workerPool.doWork([&] {
-				while (true) {
-					uint32 i = ti++;
-					if (i >= scnf.size()) break;
+				uint32 ct = 0, lt = 0;
+				uint32 begin = batchSize * batchIndex++;
+				uint32 end = std::min(begin + batchSize, (uint32) scnf.size());
+
+				for (uint32 i = begin; i < end; i++) {
 					if (scnf[i]->original() || scnf[i]->learnt()) {
-						c++;
-						l += scnf[i]->size();
+						ct++;
+						lt += scnf[i]->size();
 					}
 				}
+
+				c += ct;
+				l += lt;
 			});
 
 			workerPool.join();
