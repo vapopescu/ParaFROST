@@ -24,45 +24,28 @@ using namespace SIGmA;
 void ParaFROST::createOT(const bool& rst)
 {
 	if (opts.profile_simp) timer.pstart();
-	std::atomic<size_t> batchSize, batchIdx;
 
 	// reset ot
 	if (rst) {
-		batchSize = inf.maxVar / workerPool.count() + 1;
-		batchIdx = 0;
-		workerPool.doWork([&] {
-			size_t begin = 1 + batchSize * batchIdx++;
-			size_t end = begin + batchSize;
-			end = std::min(end, (size_t) (inf.maxVar + 1));
-
-			for (size_t i = begin; i < end; i++) {
-				uint32 p = V2L(i);
-				ot[p].clear();
-				ot[NEG(p)].clear();
-			}
+		workerPool.doWorkForEach((size_t)1, (size_t)(inf.maxVar + 1), [this](size_t i) {
+			uint32 p = V2L(i);
+			ot[p].clear();
+			ot[NEG(p)].clear();
 		});
 
 		workerPool.join();
 	}
 
 	// create ot
-	batchSize = (scnf.size() - 1) / workerPool.count() + 1;
-	batchIdx = 0;
-	workerPool.doWork([&] {
-		size_t begin = batchSize * batchIdx++;
-		size_t end = begin + batchSize;
-		end = std::min(end, scnf.size());
-
-		for (size_t i = begin; i < end; i++) {
-			SCLAUSE& c = *scnf[i];
-			if (c.learnt() || c.original()) {
-				assert(c.size());
-				for (int k = 0; k < c.size(); k++) {
-					assert(c[k] > 1);
-					ot[c[k]].lock();
-					ot[c[k]].push(scnf[i]);
-					ot[c[k]].unlock();
-				}
+	workerPool.doWorkForEach((size_t)0, (size_t)scnf.size(), [this](size_t i) {
+		SCLAUSE& c = *scnf[i];
+		if (c.learnt() || c.original()) {
+			assert(c.size());
+			for (int k = 0; k < c.size(); k++) {
+				assert(c[k] > 1);
+				ot[c[k]].lock();
+				ot[c[k]].push(scnf[i]);
+				ot[c[k]].unlock();
 			}
 		}
 	});

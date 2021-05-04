@@ -164,7 +164,6 @@
     <ClCompile Include="pfsubsume.cpp" />
     <ClCompile Include="pfvmap.cpp" />
     <ClCompile Include="pfwatch.cpp" />
-    <ClCompile Include="pfworker.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
