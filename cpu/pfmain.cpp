@@ -22,16 +22,20 @@ using namespace pFROST;
 
 bool quiet_en = false;
 int verbose = -1;
+bool color = false;
 
 int main(int argc, char **argv)
-{             
+{
 	BOOL_OPT opt_quiet_en("q", "enable quiet mode, same as verbose=0", false);
 	INT_OPT opt_verbose("verbose", "set the verbosity", 1, INT32R(0, 4));
+	BOOL_OPT opt_color_en("color", "enable colorful output in the console", false);
 	INT_OPT opt_timeout("timeout", "set the timeout in seconds", 0, INT32R(0, INT32_MAX));
 	if (argc == 1) PFLOGE("no input file specified");
 	try {
 		parseArguments(argc, argv);
-		quiet_en = opt_quiet_en, verbose = opt_verbose;
+		quiet_en = opt_quiet_en; 
+		verbose = opt_verbose;
+		color = opt_color_en;
 		if (quiet_en) verbose = 0;
 		else if (!verbose) quiet_en = true;
 		if (!quiet_en && verbose) {
