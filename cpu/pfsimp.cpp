@@ -41,6 +41,7 @@ void ParaFROST::createOT(const bool& rst)
 				ot[NEG(p)].clear();
 			}
 		});
+
 		workerPool.join();
 	}
 
@@ -108,6 +109,7 @@ void ParaFROST::sortOT()
 			std::sort(negs.data(), negs.data() + negs.size(), CNF_CMP_KEY());
 		}
 	});
+
 	workerPool.join();
 	if (opts.profile_simp) timer.pstop(), timer.sot += timer.pcpuTime();
 }

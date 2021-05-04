@@ -601,6 +601,7 @@ namespace pFROST {
 						occurs[i].ns = 0;
 					};
 				});
+
 				workerPool.join();
 			}
 
@@ -621,8 +622,8 @@ namespace pFROST {
 					}
 				}
 			});
-			workerPool.join();
 
+			workerPool.join();
 			assert(occurs[0].ps == 0 && occurs[0].ns == 0);
 		}
 		inline void		removeClause		(S_REF& c) { assert(c != NULL); delete c; c = NULL; }
