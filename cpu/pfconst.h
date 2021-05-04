@@ -23,6 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 extern bool quiet_en;
 extern int verbose;
+extern bool color;
 
 namespace pFROST {
 //=======================================//
