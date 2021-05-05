@@ -39,7 +39,12 @@ bool ParaFROST::prop()
 				cv1.wait(lock, condition);
 				working++;
 			}
-			if (terminate || cnfstate == UNSAT) break;
+			if (terminate) break;
+			else if (cnfstate == UNSAT) {
+				working--;
+				cv2.notify_one();
+				break;
+			}
 			uint32 assign = trail[sp->propagated++];
 			lock.unlock();
 
@@ -56,11 +61,8 @@ bool ParaFROST::prop()
 				// clause is unit or conflict
 				// Note: attach & strengthen don't check for conflict before enqueue
 				if (c->size() == 0) {
-
 					std::unique_lock<std::mutex> lock(m);
 					cnfstate = UNSAT;
-					working = 0;
-					lock.unlock();
 					break;
 				}
 				if (c->size() == 1) {
@@ -73,8 +75,6 @@ bool ParaFROST::prop()
 					}
 					else {
 						cnfstate = UNSAT;
-						working = 0;
-						lock.unlock();
 						break;
 					}
 				}
@@ -85,7 +85,7 @@ bool ParaFROST::prop()
 	});
 
 	std::unique_lock<std::mutex> lock(m);
-	while (working) cv2.wait(lock);
+	cv2.wait(lock, [&working] { return working == 0; });
 	terminate = true;
 	cv1.notify_all();
 	lock.unlock();
@@ -245,7 +245,7 @@ void ParaFROST::BCE()
 				if (!v) continue;
 				uint32 p = V2L(v), n = NEG(p);
 				if (ot[p].size() <= opts.bce_limit && ot[n].size() <= opts.bce_limit)
-					blocked_x(v, ot[p], ot[n]);
+					blocked_x(v, ot[n], ot[p]);
 			}
 		});
 
