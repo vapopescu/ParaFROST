@@ -359,7 +359,7 @@ namespace SIGmA {
 		return false;
 	}
 
-	inline bool selfSubset(const S_REF sm, const S_REF lr, uVec1D& lits)
+	inline bool selfSubset(const S_REF sm, const S_REF lr, uint32& lit)
 	{
 		assert(!sm->deleted());
 		assert(!lr->deleted());
@@ -367,8 +367,13 @@ namespace SIGmA {
 		assert(lr->size() > 1);
 		assert(sm->size() <= lr->size());
 		int it1 = 0, it2 = 0, sub = 0;
+		bool self = false;
 		while (it1 < sm->size() && it2 < lr->size()) {
-			if (sm->lit(it1) == FLIP(lr->lit(it2))) { lits.push(lr->lit(it2)), sub++; it1++; it2++; }
+			if (!self && sm->lit(it1) == FLIP(lr->lit(it2))) {
+				lit = lr->lit(it2);
+				self = true;
+				sub++; it1++; it2++;
+			}
 			else if (sm->lit(it1) < lr->lit(it2)) it1++;
 			else if (lr->lit(it2) < sm->lit(it1)) it2++;
 			else { sub++; it1++; it2++; }
@@ -826,11 +831,11 @@ namespace SIGmA {
 	{
 		for (int j = 0; j < other.size(); j++) {
 			S_REF d = other[j];
-			uVec1D lits;
+			uint32 lit = 0;
 			if (d->size() > c->size()) break;
 			if (d->deleted()) continue;
-			if (d->size() > 1 && selfSubset_sig(d->sig(), c->sig()) && selfSubset(d, c, lits)) {
-				if (lits.empty()) {
+			if (d->size() > 1 && selfSubset_sig(d->sig(), c->sig()) && selfSubset(d, c, lit)) {
+				if (lit == 0) {
 					if (d->learnt() && c->original()) d->set_status(ORIGINAL);
 #if HSE_DBG
 					PFLCLAUSE(1, (*c), " Clause ");
@@ -844,7 +849,7 @@ namespace SIGmA {
 					PFLCLAUSE(1, (*c), " Clause ");
 					PFLCLAUSE(1, (*d), " Strengthened by ");
 #endif 
-					for (uint32 i = 0; i < lits.size(); i++) pfrost->strengthen(c, lits[i]);
+					pfrost->strengthen(c, lit);
 					c->melt(); // mark for fast recongnition in ot update 
 					break; // cannot strengthen "pos" anymore, 'x' already removed
 				}
