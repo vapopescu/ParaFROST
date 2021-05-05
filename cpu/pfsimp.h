@@ -372,13 +372,13 @@ namespace SIGmA {
 			if (!self && sm->lit(it1) == FLIP(lr->lit(it2))) {
 				lit = lr->lit(it2);
 				self = true;
-				sub++; it1++; it2++;
+				it1++; it2++;
 			}
 			else if (sm->lit(it1) < lr->lit(it2)) return false;
 			else if (lr->lit(it2) < sm->lit(it1)) it2++;
 			else { sub++; it1++; it2++; }
 		}
-		if (sub == sm->size()) return true;
+		if (self && sub + 1 == sm->size()) return true;
 		return false;
 	}
 
@@ -827,45 +827,13 @@ namespace SIGmA {
 		return true;
 	}
 
-	inline bool self_sub_x(S_REF& c, OL& other)
-	{
-		for (int j = 0; j < other.size(); j++) {
-			S_REF d = other[j];
-			if (c == d) continue;
-			uint32 lit = 0;
-			if (d->size() > c->size()) continue;
-			if (d->deleted()) continue;
-			if (d->size() > 1 && selfSubset_sig(d->sig(), c->sig()) && selfSubset(d, c, lit)) {
-				if (lit != 0) {
-#if HSE_DBG
-					PFLCLAUSE(1, (*c), " Clause ");
-					PFLCLAUSE(1, (*d), " Strengthened by ");
-#endif 
-					pfrost->strengthen(c, lit);
-					c->melt(); // mark for fast recongnition in ot update 
-					return false; // cannot strengthen "pos" anymore, 'x' already removed
-				} 
-				else {
-					if (d->learnt() && c->original()) d->set_status(ORIGINAL);
-#if HSE_DBG
-					PFLCLAUSE(1, (*c), " Clause ");
-					PFLCLAUSE(1, (*d), " Subsumed by ");
-#endif 
-					c->markDeleted();
-					return true;
-				}
-			}
-		}
-		return true;
-	}
-
 	inline void sub_x(S_REF& c, S_REF* begin, S_REF* end)
 	{
 		for (S_REF* j = begin; j < end; j++) {
 			S_REF d = *j;
 			uint32 lit = 0;
 			if (d->deleted()) continue;
-			if (c->molten() && d->size() > c->size()) continue;
+			if (d->size() >= c->size()) break;
 			if (d->size() > 1 && subset_sig(d->sig(), c->sig()) && subset(d, c)) {
 				if (d->learnt() && c->original()) d->set_status(ORIGINAL);
 #if HSE_DBG
@@ -874,6 +842,25 @@ namespace SIGmA {
 #endif 
 				c->markDeleted();
 				break;
+			}
+		}
+	}
+
+	inline void self_sub_x(S_REF& c, OL& other)
+	{
+		for (int j = 0; j < other.size(); j++) {
+			S_REF d = other[j];
+			uint32 lit = 0;
+			if (d->deleted()) continue;
+			if (d->size() > c->size()) break;
+			if (d->size() > 1 && selfSubset_sig(d->sig(), c->sig()) && selfSubset(d, c, lit)) {
+#if HSE_DBG
+				PFLCLAUSE(1, (*c), " Clause ");
+				PFLCLAUSE(1, (*d), " Strengthened by ");
+#endif 
+				pfrost->strengthen(c, lit);
+				c->melt(); // mark for fast recongnition in ot update 
+				break; // cannot strengthen "pos" anymore, 'x' already removed
 			}
 		}
 	}
@@ -926,13 +913,32 @@ namespace SIGmA {
 
 		// HSE
 		if (opts.hse_en && c->size() <= HSE_MAX_CL_SIZE) {
-			for (uint32 k = 0; k < c->size() && !c->deleted(); k++) {
+			OL ol;
+
+			for (uint32 k = 0; k < c->size(); k++) {
 				uint32 l = c->lit(k);
 				assert(l > 1);
-				OL& ol = ot[l];
-				if (ol.size() <= opts.hse_limit) while (!self_sub_x(c, ol));
-				if (c->deleted() || c->molten()) { ol.lock(); updateOL(ol); ol.unlock(); }
+
+				for (int j = 0; j < ol.size(); j++) {
+					S_REF d = ol[j];
+					if (!d->deleted() && d->size() < c->size()) ol.push(d);
+				}
 			}
+
+			if (ol.size() <= opts.hse_limit)
+				for (uint32 j = 0; j < ol.size(); j++) {
+					S_REF d = ol[j];
+					uint32 lit = 0;
+					if (d->size() > 1 && subset_sig(d->sig(), c->sig()) && subset(d, c)) {
+						if (d->learnt() && c->original()) d->set_status(ORIGINAL);
+#if HSE_DBG
+						PFLCLAUSE(1, (*neg), " Clause ");
+						PFLCLAUSE(1, (*sm_c), " Subsumed by ");
+#endif 
+						c->markDeleted();
+						break;
+					}
+				}
 		}
 
 		// BCE
@@ -940,9 +946,17 @@ namespace SIGmA {
 			for (uint32 k = 0; k < c->size() && !c->deleted(); k++) {
 				OL& ol = ot[FLIP(c->lit(k))];
 				if (ol.size() <= opts.bce_limit) blocked_x(ABS(c->lit(k)), c, ol);
-				if (c->deleted()) { ol.lock(); updateOL(ol); ol.unlock(); }
 			}
 		}
+
+		// Update OT
+		if (c->deleted())
+			for (uint32 k = 0; k < c->size(); k++) {
+				OL& ol = ot[c->lit(k)];
+				ol.lock(); 
+				updateOL(ol); 
+				ol.unlock(); 
+			}
 	}
 
 }
