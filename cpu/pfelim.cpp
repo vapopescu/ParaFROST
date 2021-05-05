@@ -134,7 +134,7 @@ void ParaFROST::CE()
 
 			// BCE
 			if (opts.bce_en && occurs.size() <= opts.bce_limit && !c->learnt())
-				for (uint32 k = 0; k < c->size(); k++) blocked_x(c->lit(k), c, occurs);
+				for (uint32 k = 0; k < c->size() && !c->deleted(); k++) blocked_x(c->lit(k), c, ot[FLIP(c->lit(k))]);
 		});
 
 		workerPool.join();

@@ -878,14 +878,14 @@ namespace SIGmA {
 		assert(checkDeleted(poss, negs));
 	}
 
-	inline bool blocked_x(const uint32& x, S_REF& c, OL& other)
+	inline void blocked_x(const uint32& x, S_REF& c, OL& other)
 	{
 		for (int j = 0; j < other.size(); j++) {
 			S_REF d = other[j];
 			if (d->deleted() || d->learnt()) continue;
-			if (!isTautology(x, c, d)) return false;
+			if (!isTautology(x, c, d)) return;
 		}
-		return true;
+		c->markDeleted();
 	}
 
 	inline void blocked_x(const uint32& x, OL& me, OL& other)
@@ -893,7 +893,7 @@ namespace SIGmA {
 		for (int i = 0; i < me.size(); i++) {
 			S_REF c = me[i];
 			if (c->deleted() || c->learnt()) continue;
-			if (blocked_x(x, c, other)) c->markDeleted();
+			blocked_x(x, c, other);
 		}
 	}
 
