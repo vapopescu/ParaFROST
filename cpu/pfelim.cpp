@@ -108,34 +108,33 @@ void ParaFROST::CE()
 		if (opts.profile_simp) timer.pstart();
 
 		workerPool.doWorkForEach((size_t)0, scnf.size(), [&](size_t idx) {
-			OL occurs;
 			S_REF c = scnf[idx];
-			if (c->deleted()) return;
-
-			for (uint32 k = 0; k < c->size(); k++) {
-				uint32 l = c->lit(k);
-				assert(l > 1);
-				occurs.reserve(occurs.size() + ot[l].size());
-				for (uint32 i = 0; i < ot[l].size(); i++) occurs.push(ot[l][i]);
-			}
-
-			std::sort(occurs.data(), occurs.data() + occurs.size());
-			uint32 n = 0;
-			for (uint32 i = 0; i < occurs.size(); i++) {
-				if (occurs[i] == occurs[n] && i != n) continue;
-				else if (occurs[i] == c) continue;
-				else occurs[n++] = occurs[i];
-			}
-			occurs.resize(n);
+			if (c->deleted() || c->size() <= 2) return;
 
 			// HSE
-			if (opts.hse_en && occurs.size() <= opts.hse_limit && c->size() <= HSE_MAX_CL_SIZE) {
-				while (!self_sub_x(c, occurs));
+			if (opts.hse_en && c->size() <= HSE_MAX_CL_SIZE) {
+				OL ol; ol.reserve(std::max(opts.hse_limit, opts.bce_limit));
+
+				for (uint32 k = 0; k < c->size(); k++) {
+					uint32 l = c->lit(k);
+					assert(l > 1);
+					for (uint32 i = 0; i < ot[l].size(); i++) {
+						S_REF d = ot[l][i];
+						if (!d->deleted() && c != d && c->size() >= d->size())
+							ol.push(d);
+					}
+				}
+
+				if (ol.size() <= opts.hse_limit) while (!self_sub_x(c, ol));
 			}
 
 			// BCE
-			if (opts.bce_en && occurs.size() <= opts.bce_limit && !c->learnt())
-				for (uint32 k = 0; k < c->size() && !c->deleted(); k++) blocked_x(c->lit(k), c, ot[FLIP(c->lit(k))]);
+			if (opts.bce_en && !c->learnt()) {
+				for (uint32 k = 0; k < c->size() && !c->deleted(); k++) {
+					OL& flips = ot[FLIP(c->lit(k))];
+					if (flips.size() <= opts.bce_limit) blocked_x(c->lit(k), c, flips);
+				}
+			}
 		});
 
 		workerPool.join();
