@@ -107,7 +107,7 @@ inline void REPCH(const char& ch, const size_t& size, const size_t& off = 0) {
      SETCOLOR(CWARNING, stderr); \
      fprintf(stderr, "WARNING - ");\
      fprintf(stderr, FORMAT, ## __VA_ARGS__);\
-     putc('\n', stdout); \
+     putc('\n', stderr); \
      SETCOLOR(CNORMAL, stderr); \
   } while (0)
 
