@@ -351,7 +351,7 @@ namespace SIGmA {
 		assert(sm->size() <= lr->size());
 		int it1 = 0, it2 = 0, sub = 0;
 		while (it1 < sm->size() && it2 < lr->size()) {
-			if (sm->lit(it1) < lr->lit(it2)) it1++;
+			if (sm->lit(it1) < lr->lit(it2)) return false;
 			else if (lr->lit(it2) < sm->lit(it1)) it2++;
 			else { sub++; it1++; it2++; }
 		}
@@ -374,7 +374,7 @@ namespace SIGmA {
 				self = true;
 				sub++; it1++; it2++;
 			}
-			else if (sm->lit(it1) < lr->lit(it2)) it1++;
+			else if (sm->lit(it1) < lr->lit(it2)) return false;
 			else if (lr->lit(it2) < sm->lit(it1)) it2++;
 			else { sub++; it1++; it2++; }
 		}
@@ -827,7 +827,7 @@ namespace SIGmA {
 		return true;
 	}
 
-	inline void self_sub_x(S_REF& c, OL& other)
+	inline bool self_sub_x(S_REF& c, OL& other)
 	{
 		for (int j = 0; j < other.size(); j++) {
 			S_REF d = other[j];
@@ -835,24 +835,44 @@ namespace SIGmA {
 			if (d->size() > c->size()) break;
 			if (d->deleted()) continue;
 			if (d->size() > 1 && selfSubset_sig(d->sig(), c->sig()) && selfSubset(d, c, lit)) {
-				if (lit == 0) {
-					if (d->learnt() && c->original()) d->set_status(ORIGINAL);
-#if HSE_DBG
-					PFLCLAUSE(1, (*c), " Clause ");
-					PFLCLAUSE(1, (*d), " Subsumed by ");
-#endif 
-					c->markDeleted();
-					break;
-				}
-				else if (true /* !(opts.hla_en || opts.ala_en) */){
+				if (lit != 0) {
 #if HSE_DBG
 					PFLCLAUSE(1, (*c), " Clause ");
 					PFLCLAUSE(1, (*d), " Strengthened by ");
 #endif 
 					pfrost->strengthen(c, lit);
 					c->melt(); // mark for fast recongnition in ot update 
-					break; // cannot strengthen "pos" anymore, 'x' already removed
+					return false; // cannot strengthen "pos" anymore, 'x' already removed
+				} 
+				else {
+					if (d->learnt() && c->original()) d->set_status(ORIGINAL);
+#if HSE_DBG
+					PFLCLAUSE(1, (*c), " Clause ");
+					PFLCLAUSE(1, (*d), " Subsumed by ");
+#endif 
+					c->markDeleted();
+					return true;
 				}
+			}
+		}
+		return true;
+	}
+
+	inline void sub_x(S_REF& c, S_REF* begin, S_REF* end)
+	{
+		for (S_REF* j = begin; j < end; j++) {
+			S_REF d = *j;
+			uint32 lit = 0;
+			if (d->deleted()) continue;
+			if (c->molten() && d->size() > c->size()) continue;
+			if (d->size() > 1 && subset_sig(d->sig(), c->sig()) && subset(d, c)) {
+				if (d->learnt() && c->original()) d->set_status(ORIGINAL);
+#if HSE_DBG
+				PFLCLAUSE(1, (*neg), " Clause ");
+				PFLCLAUSE(1, (*sm_c), " Subsumed by ");
+#endif 
+				c->markDeleted();
+				break;
 			}
 		}
 	}
@@ -864,14 +884,16 @@ namespace SIGmA {
 			S_REF c = poss[i];
 			if (c->size() > HSE_MAX_CL_SIZE) break;
 			if (c->deleted()) continue;
-			self_sub_x(c, negs); 
+			self_sub_x(c, negs);
+			sub_x(c, poss.data(), &poss[i]);
 		}
 		updateOL(poss);
 		for (int i = 0; i < negs.size(); i++) {
 			S_REF c = negs[i];
 			if (c->size() > HSE_MAX_CL_SIZE) break;
 			if (c->deleted()) continue;
-			self_sub_x(c, poss); 
+			self_sub_x(c, poss);
+			sub_x(c, negs.data(), &negs[i]);
 		}
 		updateOL(negs);
 		assert(checkMolten(poss, negs));

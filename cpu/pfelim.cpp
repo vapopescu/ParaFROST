@@ -129,8 +129,9 @@ void ParaFROST::CE()
 			occurs.resize(n);
 
 			// HSE
-			if (opts.hse_en && occurs.size() <= opts.hse_limit && c->size() <= HSE_MAX_CL_SIZE)
-				self_sub_x(c, occurs);
+			if (opts.hse_en && occurs.size() <= opts.hse_limit && c->size() <= HSE_MAX_CL_SIZE) {
+				while (!self_sub_x(c, occurs));
+			}
 
 			// BCE
 			if (opts.bce_en && occurs.size() <= opts.bce_limit && !c->learnt())
