@@ -23,6 +23,7 @@ using namespace pFROST;
 // simplifier options
 BOOL_OPT opt_ve_en("ve", "enable bounded variable elimination (BVE)", true);
 BOOL_OPT opt_ve_plus_en("ve+", "enable HSE + BVE", true);
+BOOL_OPT opt_ce_en("ce", "enable clause elimination stage", true);
 BOOL_OPT opt_hse_en("hse", "enable hybrid subsumption elimination", true);
 BOOL_OPT opt_bce_en("bce", "enable blocked clause elimination", false);
 BOOL_OPT opt_ere_en("ere", "enable eager redundancy elimination", true);
@@ -192,6 +193,7 @@ void OPTION::init() {
 		ere_limit = opt_ere_max_occurs;
 		xor_max_arity = opt_xor_max_arity;
 		ve_en = opt_ve_en || ve_plus_en;
+		ce_en = opt_ce_en;
 		hse_en = opt_hse_en || ve_plus_en;
 		if (all_en) ve_en = 1, ve_plus_en = 1, bce_en = 1, ere_en = 1;
 		if (!phases && (ve_en || hse_en || bce_en)) phases = 1; // at least 1 phase needed

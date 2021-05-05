@@ -85,6 +85,7 @@ namespace pFROST {
 		bool	aggr_cnf_sort;
 		bool	profile_simp;
 		bool	ve_en, ve_plus_en;
+		bool	ce_en;
 		bool	sigma_en, sigma_live_en;
 		//------------------------------------------//
 		int		phases;

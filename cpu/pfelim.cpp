@@ -100,6 +100,50 @@ bool ParaFROST::prop()
 	return true;
 }
 
+void ParaFROST::CE()
+{
+	if (opts.ce_en && (opts.hse_en || opts.bce_en)) {
+		if (interrupted()) killSolver();
+		PFLOGN2(2, "  Eliminating clauses..");
+		if (opts.profile_simp) timer.pstart();
+
+		workerPool.doWorkForEach((size_t)0, scnf.size(), [&](size_t idx) {
+			OL occurs;
+			S_REF c = scnf[idx];
+			if (c->deleted()) return;
+
+			for (uint32 k = 0; k < c->size(); k++) {
+				uint32 l = c->lit(k);
+				assert(l > 1);
+				occurs.reserve(occurs.size() + ot[l].size());
+				for (uint32 i = 0; i < ot[l].size(); i++) occurs.push(ot[l][i]);
+			}
+
+			std::sort(occurs.data(), occurs.data() + occurs.size());
+			uint32 n = 0;
+			for (uint32 i = 0; i < occurs.size(); i++) {
+				if (occurs[i] == occurs[n] && i != n) continue;
+				else if (occurs[i] == c) continue;
+				else occurs[n++] = occurs[i];
+			}
+			occurs.resize(n);
+
+			// HSE
+			if (opts.hse_en && occurs.size() <= opts.hse_limit && c->size() <= HSE_MAX_CL_SIZE)
+				self_sub_x(c, occurs);
+
+			// BCE
+			if (opts.bce_en && occurs.size() <= opts.bce_limit && !c->learnt())
+				for (uint32 k = 0; k < c->size(); k++) blocked_x(c->lit(k), c, occurs);
+		});
+
+		workerPool.join();
+		if (opts.profile_simp) timer.pstop(), timer.hse += timer.pcpuTime();
+		PFLDONE(2, 5);
+		PFLREDALL(this, 2, "Clause Reductions");
+	}
+}
+
 void ParaFROST::bve()
 {
 	if (interrupted()) killSolver();
@@ -203,7 +247,7 @@ void ParaFROST::VE()
 
 void ParaFROST::HSE()
 {
-	if (opts.hse_en || opts.ve_plus_en) {
+	if (!opts.ce_en && (opts.hse_en || opts.ve_plus_en)) {
 		if (interrupted()) killSolver();
 		PFLOGN2(2, "  Eliminating (self)-subsumptions..");
 		if (opts.profile_simp) timer.pstart();
@@ -218,7 +262,7 @@ void ParaFROST::HSE()
 				assert(sp->vstate[v] == ACTIVE);
 				uint32 p = V2L(v), n = NEG(p);
 				if (ot[p].size() <= opts.hse_limit && ot[n].size() <= opts.hse_limit)
-					self_sub_x(p, ot[p], ot[n]);
+					self_sub_x(ot[p], ot[n]);
 			}
 		});
 
@@ -250,7 +294,6 @@ void ParaFROST::BCE()
 		});
 
 		workerPool.join();
-		
 		if (opts.profile_simp) timer.pstop(), timer.bce += timer.pcpuTime();
 		PFLDONE(2, 5);
 		PFLREDALL(this, 2, "BCE Reductions");

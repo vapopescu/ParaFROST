@@ -179,7 +179,7 @@ void ParaFROST::resetSolver() {
 void ParaFROST::solve()
 {
 	timer.start();
-	if (canPreSigmify()) sigmify();
+	if (canPreSigmify()) sigmify(false);
 	PFLOG2(2, "-- CDCL search started..");
 	if (cnfstate == UNSOLVED) MDMInit();
 	while (cnfstate == UNSOLVED && !interrupted()) {
@@ -190,7 +190,7 @@ void ParaFROST::solve()
 		else if (canRephase()) rephase();
 		else if (canReduce()) reduce();
 		else if (canSubsume()) subsume();
-		else if (canSigmify()) sigmify();
+		else if (canSigmify()) sigmify(true);
 		else if (canMMD()) MDM();
 		else decide();
 		PFLTRAIL(this, 3);

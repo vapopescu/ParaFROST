@@ -137,7 +137,7 @@ void ParaFROST::awaken(const bool& strict)
 	return;
 }
 
-void ParaFROST::sigmify()
+void ParaFROST::sigmify(const bool& live)
 {
 	/********************************/
 	/*		Getting ready...        */
@@ -154,45 +154,47 @@ void ParaFROST::sigmify()
 	awaken();
 	if (cnfstate == UNSAT || sigState == AWAKEN_FAIL) return;
 	if (sigState == SALLOC_FAIL) return;
-	if (interrupted()) killSolver();
-	int64 before, diff;
-	/********************************/
-	/*      V/C Eliminations        */
-	/********************************/
-	assert(!phase && !mu_inc);
-	before = inf.nLiterals, diff = INT64_MAX;
-	while (true) {
-		resizeCNF();
-		createOT(); 
-		if (!prop()) killSolver();
-		if (!LCVE()) break;
-		sortOT();
-		if (stop(diff)) { ERE(); break; }
-		HSE(), VE(), BCE();
-		countAll(), filterPVs(); 
-		inf.nClauses = inf.n_cls_after, inf.nLiterals = inf.n_lits_after;
-		diff = before - inf.nLiterals, before = inf.nLiterals;
-		phase++, mu_inc++;
-		mu_inc += phase == opts.phases;
-	} 
-	/********************************/
-	/*          Write Back          */
-	/********************************/
-	assert(sp->propagated == trail.size());
-	if (interrupted()) killSolver();
-	occurs.clear(true), ot.clear(true);
-	countFinal();
-	shrinkSimp(), assert(inf.nClauses == scnf.size());
-	stats.sigmifications++;
-	lrn.elim_lastmarked = lrn.elim_marked;
-	if (opts.aggr_cnf_sort) std::stable_sort(scnf.data(), scnf.data() + scnf.size(), CNF_CMP_KEY());
-	if (inf.maxFrozen > sp->simplified) stats.n_forced += inf.maxFrozen - sp->simplified;
-	if (satisfied() || !inf.nClauses) 
-		cnfstate = SAT, printStats(1, 'p', CGREEN);
-	else {
-		if (maxInactive() > opts.map_min) map(true);
-		else assert(!mapped), newBeginning();
-		sigmaDelay();
+	if (!interrupted()) {
+		int64 before, diff;
+		/********************************/
+		/*      V/C Eliminations        */
+		/********************************/
+		assert(!phase && !mu_inc);
+		before = inf.nLiterals, diff = INT64_MAX;
+		while (true) {
+			resizeCNF();
+			createOT();
+			if (!prop()) break;
+			if (!LCVE()) break;
+			sortOT();
+			if (stop(diff)) { ERE(); break; }
+			if (phase == 0 && !live) CE();
+			HSE(), VE(), BCE();
+			countAll(), filterPVs();
+			inf.nClauses = inf.n_cls_after, inf.nLiterals = inf.n_lits_after;
+			diff = before - inf.nLiterals, before = inf.nLiterals;
+			phase++, mu_inc++;
+			mu_inc += phase == opts.phases;
+		}
+		/********************************/
+		/*          Write Back          */
+		/********************************/
+		assert(sp->propagated == trail.size());
+		if (interrupted()) killSolver();
+		occurs.clear(true), ot.clear(true);
+		countFinal();
+		shrinkSimp(), assert(inf.nClauses == scnf.size());
+		stats.sigmifications++;
+		lrn.elim_lastmarked = lrn.elim_marked;
+		if (opts.aggr_cnf_sort) std::stable_sort(scnf.data(), scnf.data() + scnf.size(), CNF_CMP_KEY());
+		if (inf.maxFrozen > sp->simplified) stats.n_forced += inf.maxFrozen - sp->simplified;
+		if (satisfied() || !inf.nClauses)
+			cnfstate = SAT, printStats(1, 'p', CGREEN);
+		else {
+			if (maxInactive() > opts.map_min) map(true);
+			else assert(!mapped), newBeginning();
+			sigmaDelay();
+		}
 	}
 	if (!opts.profile_simp) timer.stop(), timer.simp += timer.cpuTime();
 	if (!opts.solve_en) killSolver();

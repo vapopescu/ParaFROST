@@ -355,12 +355,11 @@ namespace SIGmA {
 			else if (lr->lit(it2) < sm->lit(it1)) it2++;
 			else { sub++; it1++; it2++; }
 		}
-		if (sub == sm->size())
-			return true;
+		if (sub == sm->size()) return true;
 		return false;
 	}
 
-	inline bool selfSubset(const uint32& x, const S_REF sm, const S_REF lr)
+	inline bool selfSubset(const S_REF sm, const S_REF lr, uVec1D& lits)
 	{
 		assert(!sm->deleted());
 		assert(!lr->deleted());
@@ -368,23 +367,13 @@ namespace SIGmA {
 		assert(lr->size() > 1);
 		assert(sm->size() <= lr->size());
 		int it1 = 0, it2 = 0, sub = 0;
-		bool self = false;
 		while (it1 < sm->size() && it2 < lr->size()) {
-			if (sm->lit(it1) == FLIP(x)) it1++;
-			else if (lr->lit(it2) == x) { self = true; it2++; }
+			if (sm->lit(it1) == FLIP(lr->lit(it2))) { lits.push(lr->lit(it2)), sub++; it1++; it2++; }
 			else if (sm->lit(it1) < lr->lit(it2)) it1++;
 			else if (lr->lit(it2) < sm->lit(it1)) it2++;
 			else { sub++; it1++; it2++; }
 		}
-		if ((sub + 1) == sm->size()) {
-			if (self) return true;
-			else {
-				while (it2 < lr->size()) {
-					if (lr->lit(it2) == x) return true;
-					it2++;
-				}
-			}
-		}
+		if (sub == sm->size()) return true;
 		return false;
 	}
 
@@ -833,98 +822,73 @@ namespace SIGmA {
 		return true;
 	}
 
-	inline void self_sub_x(const uint32& x, OL& poss, OL& negs)
+	inline void self_sub_x(S_REF& c, OL& other)
 	{
-		assert(checkMolten(poss, negs));
-		// positives vs negatives
-		for (int i = 0; i < poss.size(); i++) {
-			S_REF pos = poss[i];
-			if (pos->size() > HSE_MAX_CL_SIZE) break;
-			if (pos->deleted()) continue;
-			// self-subsumption check
-			for (int j = 0; j < negs.size(); j++) {
-				S_REF neg = negs[j];
-				if (neg->size() > pos->size()) break;
-				if (neg->deleted()) continue;
-				if (neg->size() > 1 && selfSubset_sig(neg->sig(), pos->sig()) && selfSubset(x, neg, pos)) {
+		for (int j = 0; j < other.size(); j++) {
+			S_REF d = other[j];
+			uVec1D lits;
+			if (d->size() > c->size()) break;
+			if (d->deleted()) continue;
+			if (d->size() > 1 && selfSubset_sig(d->sig(), c->sig()) && selfSubset(d, c, lits)) {
+				if (lits.empty()) {
+					if (d->learnt() && c->original()) d->set_status(ORIGINAL);
 #if HSE_DBG
-					PFLCLAUSE(1, (*pos), " Clause ");
-					PFLCLAUSE(1, (*neg), " Strengthened by ");
+					PFLCLAUSE(1, (*c), " Clause ");
+					PFLCLAUSE(1, (*d), " Subsumed by ");
 #endif 
-					pfrost->strengthen(pos, x);
-					pos->melt(); // mark for fast recongnition in ot update 
+					c->markDeleted();
+					break;
+				}
+				else if (true /* !(opts.hla_en || opts.ala_en) */){
+#if HSE_DBG
+					PFLCLAUSE(1, (*c), " Clause ");
+					PFLCLAUSE(1, (*d), " Strengthened by ");
+#endif 
+					for (uint32 i = 0; i < lits.size(); i++) pfrost->strengthen(c, lits[i]);
+					c->melt(); // mark for fast recongnition in ot update 
 					break; // cannot strengthen "pos" anymore, 'x' already removed
 				}
 			}
-			// subsumption check
-			for (int j = 0; j < i; j++) {
-				S_REF sm_c = poss[j];
-				if (sm_c->deleted()) continue;
-				if (pos->molten() && sm_c->size() > pos->size()) continue;
-				if (sm_c->size() > 1 && subset_sig(sm_c->sig(), pos->sig()) && subset(sm_c, pos)) {
-					if (sm_c->learnt() && pos->original()) sm_c->set_status(ORIGINAL);
-#if HSE_DBG
-					PFLCLAUSE(1, (*pos), " Clause ");
-					PFLCLAUSE(1, (*sm_c), " Subsumed by ");
-#endif 
-					pos->markDeleted();
-					break;
-				}
-			}
+		}
+	}
+
+	inline void self_sub_x(OL& poss, OL& negs)
+	{
+		assert(checkMolten(poss, negs));
+		for (int i = 0; i < poss.size(); i++) {
+			S_REF c = poss[i];
+			if (c->size() > HSE_MAX_CL_SIZE) break;
+			if (c->deleted()) continue;
+			self_sub_x(c, negs); 
 		}
 		updateOL(poss);
-		// negatives vs positives
 		for (int i = 0; i < negs.size(); i++) {
-			S_REF neg = negs[i];
-			if (neg->size() > HSE_MAX_CL_SIZE) break;
-			if (neg->deleted()) continue;
-			// self-subsumption check
-			for (int j = 0; j < poss.size(); j++) {
-				S_REF pos = poss[j];
-				if (pos->size() >= neg->size()) break;
-				if (pos->deleted()) continue;
-				if (pos->size() > 1 && selfSubset_sig(pos->sig(), neg->sig()) && selfSubset(NEG(x), pos, neg)) {
-#if HSE_DBG
-					PFLCLAUSE(1, (*neg), " Clause ");
-					PFLCLAUSE(1, (*pos), " Strengthened by ");
-#endif 
-					pfrost->strengthen(neg, NEG(x));
-					neg->melt();
-					break;
-				}
-			}
-			// subsumption check
-			for (int j = 0; j < i; j++) {
-				S_REF sm_c = negs[j];
-				if (sm_c->deleted()) continue;
-				if (neg->molten() && sm_c->size() > neg->size()) continue;
-				if (sm_c->size() > 1 && subset_sig(sm_c->sig(), neg->sig()) && subset(sm_c, neg)) {
-					if (sm_c->learnt() && neg->original()) sm_c->set_status(ORIGINAL);
-#if HSE_DBG
-					PFLCLAUSE(1, (*neg), " Clause ");
-					PFLCLAUSE(1, (*sm_c), " Subsumed by ");
-#endif 
-					neg->markDeleted();
-					break;
-				}
-			}
+			S_REF c = negs[i];
+			if (c->size() > HSE_MAX_CL_SIZE) break;
+			if (c->deleted()) continue;
+			self_sub_x(c, poss); 
 		}
 		updateOL(negs);
 		assert(checkMolten(poss, negs));
 		assert(checkDeleted(poss, negs));
 	}
 
-	inline void blocked_x(const uint32& x, OL& poss, OL& negs)
+	inline bool blocked_x(const uint32& x, S_REF& c, OL& other)
 	{
-		// start with negs
-		for (int i = 0; i < negs.size(); i++) {
-			if (negs[i]->deleted() || negs[i]->learnt()) continue;
-			bool allTautology = true;
-			for (int j = 0; j < poss.size(); j++) {
-				if (poss[j]->deleted() || poss[j]->learnt()) continue;
-				if (!isTautology(x, negs[i], poss[j])) { allTautology = false; break; }
-			}
-			if (allTautology) negs[i]->markDeleted();
+		for (int j = 0; j < other.size(); j++) {
+			S_REF d = other[j];
+			if (d->deleted() || d->learnt()) continue;
+			if (!isTautology(x, c, d)) return false;
+		}
+		return true;
+	}
+
+	inline void blocked_x(const uint32& x, OL& me, OL& other)
+	{
+		for (int i = 0; i < me.size(); i++) {
+			S_REF c = me[i];
+			if (c->deleted() || c->learnt()) continue;
+			if (blocked_x(x, c, other)) c->markDeleted();
 		}
 	}
 

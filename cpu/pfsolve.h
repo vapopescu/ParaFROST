@@ -633,10 +633,11 @@ namespace pFROST {
 		void	varReorder			();
 		void	newBeginning		();
 		void	shrinkSimp			();
-		void	sigmify				();
+		void	sigmify				(const bool& = false);
 		bool	LCVE				();
 		bool	prop				();
 		void	bve					();
+		void	CE					();
 		void	VE					();
 		void	HSE					();
 		void	ERE					();
