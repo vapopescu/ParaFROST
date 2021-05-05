@@ -32,7 +32,7 @@ bool ParaFROST::prop()
 	workerPool.doWork([&] {
 		while (true) {
 			std::unique_lock<std::mutex> lock(m);
-			std::function<bool()> condition = [&] { return terminate || cnfstate == UNSAT || sp->propagated == trail.size(); };
+			std::function<bool()> condition = [&] { return sp->propagated < trail.size() || terminate || cnfstate == UNSAT; };
 			if (!condition()) {
 				working--;
 				cv2.notify_one();
@@ -105,14 +105,12 @@ void ParaFROST::bve()
 	if (interrupted()) killSolver();
 	if (opts.profile_simp) timer.pstart();
 	std::atomic<uint32> ti = 0;
-	int res = 0;
-	std::mutex mutex;
+	std::vector<uVec1D> resolved(PVs.size());
+	std::vector<SCNF> new_res(PVs.size());
 
 	workerPool.doWork([&] {
 		Lits_t out_c;
 		out_c.reserve(INIT_CAP);
-		uVec1D resolved;
-		SCNF new_res;
 
 		while (true) {
 			uint32 i = ti++;
@@ -126,7 +124,7 @@ void ParaFROST::bve()
 			countOrgs(poss, pOrgs), countOrgs(negs, nOrgs);
 			// pure-literal
 			if (!pOrgs || !nOrgs) {
-				toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
+				toblivion(p, pOrgs, nOrgs, poss, negs, resolved[i]);
 				sp->vstate[v] = MELTED, v = 0;
 			}
 			else {
@@ -135,55 +133,61 @@ void ParaFROST::bve()
 				uint32 def;
 				// Equiv/NOT-gate Reasoning
 				if (def = find_BN_gate(p, poss, negs)) {
-					saveResolved(p, pOrgs, nOrgs, poss, negs, resolved);
+					saveResolved(p, pOrgs, nOrgs, poss, negs, resolved[i]);
 					substitute_single(p, def, poss, negs);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// AND-gate Reasoning
-				else if (find_AO_gate(n, pOrgs + nOrgs, ot, out_c, new_res)) {
-					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
+				else if (find_AO_gate(n, pOrgs + nOrgs, ot, out_c, new_res[i])) {
+					toblivion(p, pOrgs, nOrgs, poss, negs, resolved[i]);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// OR-gate Reasoning
-				else if (find_AO_gate(p, pOrgs + nOrgs, ot, out_c, new_res)) {
-					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
+				else if (find_AO_gate(p, pOrgs + nOrgs, ot, out_c, new_res[i])) {
+					toblivion(p, pOrgs, nOrgs, poss, negs, resolved[i]);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// ITE-gate Reasoning
-				else if (find_ITE_gate(p, pOrgs + nOrgs, ot, out_c, new_res)) {
-					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
+				else if (find_ITE_gate(p, pOrgs + nOrgs, ot, out_c, new_res[i])) {
+					toblivion(p, pOrgs, nOrgs, poss, negs, resolved[i]);
 					sp->vstate[v] = MELTED, v = 0;
 				}
-				else if (find_ITE_gate(n, pOrgs + nOrgs, ot, out_c, new_res)) {
-					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
+				else if (find_ITE_gate(n, pOrgs + nOrgs, ot, out_c, new_res[i])) {
+					toblivion(p, pOrgs, nOrgs, poss, negs, resolved[i]);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// XOR-gate Reasoning
-				else if (find_XOR_gate(p, pOrgs + nOrgs, ot, out_c, new_res)) {
-					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
+				else if (find_XOR_gate(p, pOrgs + nOrgs, ot, out_c, new_res[i])) {
+					toblivion(p, pOrgs, nOrgs, poss, negs, resolved[i]);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 				// n-by-m resolution
-				else if (resolve_x(v, pOrgs, nOrgs, poss, negs, out_c, new_res, false)) {
-					toblivion(p, pOrgs, nOrgs, poss, negs, resolved);
+				else if (resolve_x(v, pOrgs, nOrgs, poss, negs, out_c, new_res[i], false)) {
+					toblivion(p, pOrgs, nOrgs, poss, negs, resolved[i]);
 					sp->vstate[v] = MELTED, v = 0;
 				}
 			}
 		}
-
-		mutex.lock();
-		model.resolved.reserve(model.resolved.size() + resolved.size());
-		for (int i = 0; i < resolved.size(); i++) {
-			model.resolved.push(resolved[i]);
-		}
-		res += new_res.size();
-		for (int i = 0; i < new_res.size(); i++) {
-			newResolvent(new_res[i]);
-		}
-		mutex.unlock();
 	});
 
 	workerPool.join();
+	uint32 res = 0;
+	for (uint32 i = 0; i < PVs.size(); i++) {
+		res += resolved[i].size();
+	}
+
+	model.resolved.reserve(model.resolved.size() + res);
+	for (uint32 i = 0; i < PVs.size(); i++) {
+		for (int j = 0; j < resolved[i].size(); j++) {
+			model.resolved.push(resolved[i][j]);
+		}
+		for (int j = 0; j < new_res[i].size(); j++) {
+			newResolvent(new_res[i][j]);
+		}
+		resolved[i].clear(true);
+		new_res[i].clear(true);
+	}
+
 	if (opts.profile_simp) timer.pstop(), timer.ve += timer.pcpuTime();
 }
 
