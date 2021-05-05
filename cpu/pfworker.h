@@ -28,7 +28,7 @@ namespace pFROST {
 
 	class WorkerPool {
 	protected:
-		const unsigned int			_MAX_BATCH_SIZE_ = 512;
+		const unsigned int			_MAX_BATCH_SIZE_ = 128;
 		std::vector<std::thread>	_workers;
 		std::vector<Job>			_jobQueue;
 		std::mutex					_mutex;
@@ -110,7 +110,8 @@ namespace pFROST {
 			while (idx < end) {
 				if (idx + batchSize > end) batchSize = end - idx;
 				_jobQueue.push_back([this, idx, batchSize, job] {
-					for (IntType j = idx; j < idx + batchSize; j++) job(j);
+					for (IntType j = idx; j < idx + batchSize; j++)
+						job(j);
 				});
 				idx += batchSize;
 			}

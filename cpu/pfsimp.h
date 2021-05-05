@@ -831,8 +831,9 @@ namespace SIGmA {
 	{
 		for (int j = 0; j < other.size(); j++) {
 			S_REF d = other[j];
+			if (c == d) continue;
 			uint32 lit = 0;
-			if (d->size() > c->size()) break;
+			if (d->size() > c->size()) continue;
 			if (d->deleted()) continue;
 			if (d->size() > 1 && selfSubset_sig(d->sig(), c->sig()) && selfSubset(d, c, lit)) {
 				if (lit != 0) {
@@ -916,6 +917,31 @@ namespace SIGmA {
 			S_REF c = me[i];
 			if (c->deleted() || c->learnt()) continue;
 			blocked_x(x, c, other);
+		}
+	}
+
+	inline void clause_elim(S_REF& c, OT& ot, const OPTION& opts)
+	{
+		if (c->deleted() || c->size() <= 2) return;
+
+		// HSE
+		if (opts.hse_en && c->size() <= HSE_MAX_CL_SIZE) {
+			for (uint32 k = 0; k < c->size() && !c->deleted(); k++) {
+				uint32 l = c->lit(k);
+				assert(l > 1);
+				OL& ol = ot[l];
+				if (ol.size() <= opts.hse_limit) while (!self_sub_x(c, ol));
+				if (c->deleted() || c->molten()) { ol.lock(); updateOL(ol); ol.unlock(); }
+			}
+		}
+
+		// BCE
+		if (opts.bce_en && !c->learnt()) {
+			for (uint32 k = 0; k < c->size() && !c->deleted(); k++) {
+				OL& ol = ot[FLIP(c->lit(k))];
+				if (ol.size() <= opts.bce_limit) blocked_x(ABS(c->lit(k)), c, ol);
+				if (c->deleted()) { ol.lock(); updateOL(ol); ol.unlock(); }
+			}
 		}
 	}
 

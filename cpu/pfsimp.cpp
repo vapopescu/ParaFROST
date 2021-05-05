@@ -137,7 +137,7 @@ void ParaFROST::awaken(const bool& strict)
 	return;
 }
 
-void ParaFROST::sigmify(const bool& live)
+void ParaFROST::sigmify()
 {
 	/********************************/
 	/*		Getting ready...        */
@@ -162,14 +162,24 @@ void ParaFROST::sigmify(const bool& live)
 		assert(!phase && !mu_inc);
 		before = inf.nLiterals, diff = INT64_MAX;
 		while (true) {
+			// Stage 1
 			resizeCNF();
 			createOT();
 			if (!prop()) break;
+
+			// Stage 2
+			// TODO
+
+			// Stage 3
+			if (phase == 0) CE();
+
+			// Stage 4
 			if (!LCVE()) break;
 			sortOT();
 			if (stop(diff)) { ERE(); break; }
-			if (phase == 0 && !live) CE();
 			HSE(), VE(), BCE();
+
+			// Cleanup
 			countAll(), filterPVs();
 			inf.nClauses = inf.n_cls_after, inf.nLiterals = inf.n_lits_after;
 			diff = before - inf.nLiterals, before = inf.nLiterals;
@@ -179,6 +189,7 @@ void ParaFROST::sigmify(const bool& live)
 		/********************************/
 		/*          Write Back          */
 		/********************************/
+		live = true;
 		assert(sp->propagated == trail.size());
 		if (interrupted()) killSolver();
 		occurs.clear(true), ot.clear(true);

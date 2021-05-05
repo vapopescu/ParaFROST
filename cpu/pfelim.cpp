@@ -102,39 +102,14 @@ bool ParaFROST::prop()
 
 void ParaFROST::CE()
 {
-	if (opts.ce_en && (opts.hse_en || opts.bce_en)) {
+	if (!live && opts.ce_en && (opts.hse_en || opts.bce_en)) {
 		if (interrupted()) killSolver();
 		PFLOGN2(2, "  Eliminating clauses..");
 		if (opts.profile_simp) timer.pstart();
 
 		workerPool.doWorkForEach((size_t)0, scnf.size(), [&](size_t idx) {
 			S_REF c = scnf[idx];
-			if (c->deleted() || c->size() <= 2) return;
-
-			// HSE
-			if (opts.hse_en && c->size() <= HSE_MAX_CL_SIZE) {
-				OL ol; ol.reserve(std::max(opts.hse_limit, opts.bce_limit));
-
-				for (uint32 k = 0; k < c->size(); k++) {
-					uint32 l = c->lit(k);
-					assert(l > 1);
-					for (uint32 i = 0; i < ot[l].size(); i++) {
-						S_REF d = ot[l][i];
-						if (!d->deleted() && c != d && c->size() >= d->size())
-							ol.push(d);
-					}
-				}
-
-				if (ol.size() <= opts.hse_limit) while (!self_sub_x(c, ol));
-			}
-
-			// BCE
-			if (opts.bce_en && !c->learnt()) {
-				for (uint32 k = 0; k < c->size() && !c->deleted(); k++) {
-					OL& flips = ot[FLIP(c->lit(k))];
-					if (flips.size() <= opts.bce_limit) blocked_x(c->lit(k), c, flips);
-				}
-			}
+			clause_elim(c, ot, opts);
 		});
 
 		workerPool.join();
@@ -275,7 +250,7 @@ void ParaFROST::HSE()
 
 void ParaFROST::BCE()
 {
-	if (opts.bce_en) {
+	if (!opts.ce_en && opts.bce_en) {
 		if (interrupted()) killSolver();
 		PFLOGN2(2, " Eliminating blocked clauses..");
 		if (opts.profile_simp) timer.pstart();

@@ -468,6 +468,7 @@ namespace pFROST {
 		OT			ot;
 		uint32		mu_inc;
 		bool		mapped;
+		bool		live;
 		int			phase, nForced, sigState;
 	public:
 		//============= inline methods ==============//
@@ -633,7 +634,7 @@ namespace pFROST {
 		void	varReorder			();
 		void	newBeginning		();
 		void	shrinkSimp			();
-		void	sigmify				(const bool& = false);
+		void	sigmify				();
 		bool	LCVE				();
 		bool	prop				();
 		void	bve					();
