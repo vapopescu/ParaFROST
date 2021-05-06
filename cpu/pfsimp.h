@@ -885,12 +885,13 @@ namespace SIGmA {
 
 	inline void blocked_x(const uint32& x, S_REF& c, OL& other)
 	{
+		bool allTautology = true;
 		for (int j = 0; j < other.size(); j++) {
 			S_REF d = other[j];
 			if (d->deleted() || d->learnt()) continue;
-			if (!isTautology(x, c, d)) return;
+			if (!isTautology(x, c, d)) { allTautology = false; break; }
 		}
-		c->markDeleted();
+		if (allTautology) c->markDeleted();
 	}
 
 	inline void blocked_x(const uint32& x, OL& me, OL& other)
