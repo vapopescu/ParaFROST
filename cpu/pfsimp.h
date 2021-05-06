@@ -909,7 +909,7 @@ namespace SIGmA {
 
 		// HSE
 		if (opts.hse_en && c->size() <= HSE_MAX_CL_SIZE) {
-			OL ol;
+			OL ol; ol.reserve(opts.hse_limit);
 
 			for (uint32 k = 0; k < c->size(); k++) {
 				uint32 l = c->lit(k);
