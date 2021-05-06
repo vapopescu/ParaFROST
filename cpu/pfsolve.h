@@ -588,39 +588,23 @@ namespace pFROST {
 		}
 		inline void		histSimp			(const SCNF& cnf, const bool& rst = false) {
 			if (cnf.empty()) return;
-			std::atomic<uint32> batchIndex, batchSize;
 
 			if (rst) {
-				batchIndex = 0;
-				batchSize = (occurs.size() - 1) / workerPool.count() + 1;
-				workerPool.doWork([&] {
-					uint32 begin = batchSize * batchIndex++;
-					uint32 end = std::min(begin + batchSize, (uint32)occurs.size());
-
-					for (uint32 i = begin; i < end; i++) {
-						occurs[i].ps = 0;
-						occurs[i].ns = 0;
-					};
+				workerPool.doWorkForEach((uint32)0, occurs.size(), [this](uint32 i) {
+					occurs[i].ps = 0;
+					occurs[i].ns = 0;
 				});
-
 				workerPool.join();
 			}
 
-			batchIndex = 0;
-			batchSize = (cnf.size() - 1) / workerPool.count() + 1;
-			workerPool.doWork([&] {
-				uint32 begin = batchSize * batchIndex++;
-				uint32 end = std::min(begin + batchSize, (uint32)cnf.size());
-				
-				for (uint32 i = begin; i < end; i++) {
-					S_REF c = cnf[i];
-					if (c->deleted()) return;
-					for (int j = 0; j < c->size(); j++) {
-						uint32 lit = (*c)[j];
-						assert(lit > 1);
-						if (SIGN(lit)) occurs[ABS(lit)].ns++;
-						else occurs[ABS(lit)].ps++;
-					}
+			workerPool.doWorkForEach((size_t)0, cnf.size(), [&](size_t i) {
+				S_REF c = cnf[i];
+				if (c->deleted()) return;
+				for (int j = 0; j < c->size(); j++) {
+					uint32 lit = (*c)[j];
+					assert(lit > 1);
+					if (SIGN(lit)) occurs[ABS(lit)].ns++;
+					else occurs[ABS(lit)].ps++;
 				}
 			});
 
