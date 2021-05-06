@@ -343,7 +343,7 @@ namespace SIGmA {
 
 	inline bool subset(const S_REF sm, const S_REF lr)
 	{
-		assert(!sm->deleted());
+		// assert(!sm->deleted());
 		assert(!lr->deleted());
 		assert(sm->size() > 1);
 		assert(lr->size() > 1);
@@ -909,22 +909,14 @@ namespace SIGmA {
 
 		// HSE
 		if (opts.hse_en && c->size() <= HSE_MAX_CL_SIZE) {
-			OL ol; ol.reserve(opts.hse_limit);
-
-			for (uint32 k = 0; k < c->size(); k++) {
-				uint32 l = c->lit(k);
-				assert(l > 1);
+			for (uint32 k = 0; k < c->size() && !c->deleted(); k++) {
+				OL& ol = ot[c->lit(k)];
+				if (ol.size() > opts.hse_limit) continue;
 
 				for (int j = 0; j < ol.size(); j++) {
 					S_REF d = ol[j];
-					if (!d->deleted() && d->size() < c->size()) ol.push(d);
-				}
-			}
-
-			if (ol.size() <= opts.hse_limit)
-				for (uint32 j = 0; j < ol.size(); j++) {
-					S_REF d = ol[j];
-					uint32 lit = 0;
+					if (d->deleted()) continue;
+					if (d->size() >= c->size()) continue;
 					if (d->size() > 1 && subset_sig(d->sig(), c->sig()) && subset(d, c)) {
 						if (d->learnt() && c->original()) d->set_status(ORIGINAL);
 #if HSE_DBG
@@ -935,6 +927,7 @@ namespace SIGmA {
 						break;
 					}
 				}
+			}
 		}
 
 		// BCE
@@ -944,15 +937,6 @@ namespace SIGmA {
 				if (ol.size() <= opts.bce_limit) blocked_x(ABS(c->lit(k)), c, ol);
 			}
 		}
-
-		// Update OT
-		if (c->deleted())
-			for (uint32 k = 0; k < c->size(); k++) {
-				OL& ol = ot[c->lit(k)];
-				ol.lock();
-				updateOL(ol);
-				ol.unlock();
-			}
 	}
 
 }

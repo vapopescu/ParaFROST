@@ -107,7 +107,7 @@ void ParaFROST::CE()
 		PFLOGN2(2, "  Eliminating clauses..");
 		if (opts.profile_simp) timer.pstart();
 
-		workerPool.doWorkForEach((size_t)0, scnf.size(), [this](size_t idx) {
+		workerPool.doWorkForEach((size_t)0, scnf.size(), (size_t)64, [this](size_t idx) {
 			clause_elim(scnf[idx], ot, opts);
 		});
 
@@ -125,6 +125,7 @@ void ParaFROST::bve()
 	std::atomic<uint32> ti = 0;
 	std::vector<uVec1D> resolved(PVs.size());
 	std::vector<SCNF> new_res(PVs.size());
+	OL resColl;
 
 	workerPool.doWork([&] {
 		Lits_t out_c;
@@ -185,13 +186,6 @@ void ParaFROST::bve()
 					sp->vstate[v] = MELTED, v = 0;
 				}
 			}
-
-			for (uint32 j = 0; j < new_res[i].size(); j++) {
-				new_res[i][j]->calcSig();
-				new_res[i][j]->set_status(ORIGINAL);
-				clause_elim(new_res[i][j], ot, opts);
-				new_res[i][j]->set_status(0);
-			}
 		}
 	});
 
@@ -201,17 +195,30 @@ void ParaFROST::bve()
 		res += resolved[i].size();
 	}
 
+	uint32 resNum = 0;
+	for (uint32 i = 0; i < PVs.size(); i++) {
+		resNum += new_res[i].size();
+	}
+
 	model.resolved.reserve(model.resolved.size() + res);
+	resColl.reserve(resNum);
 	for (uint32 i = 0; i < PVs.size(); i++) {
 		for (int j = 0; j < resolved[i].size(); j++) {
 			model.resolved.push(resolved[i][j]);
 		}
 		for (int j = 0; j < new_res[i].size(); j++) {
-			if (!new_res[i][j]->deleted()) newResolvent(new_res[i][j]);
+			newResolvent(new_res[i][j]);
+			resColl.push(new_res[i][j]);
 		}
 		resolved[i].clear(true);
 		new_res[i].clear(true);
 	}
+
+	/* if (opts.ce_en) {
+		workerPool.doWorkForEach((size_t)0, scnf.size(), (size_t)1, [this](size_t idx) {
+			clause_elim(scnf[idx], ot, opts);
+		});
+	}*/
 
 	if (opts.profile_simp) timer.pstop(), timer.ve += timer.pcpuTime();
 }
