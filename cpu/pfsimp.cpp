@@ -79,18 +79,13 @@ void ParaFROST::reduceOT()
 void ParaFROST::sortOT()
 {
 	if (opts.profile_simp) timer.pstart();
-	std::atomic<uint32> ti = 0;
-	workerPool.doWork([&] {
-		while (true) {
-			uint32 i = ti++;
-			if (i >= PVs.size()) break;
-			uint32 v = PVs[i];
-			assert(v);
-			uint32 p = V2L(v), n = NEG(p);
-			OL& poss = ot[p], & negs = ot[n];
-			std::sort(poss.data(), poss.data() + poss.size(), CNF_CMP_KEY());
-			std::sort(negs.data(), negs.data() + negs.size(), CNF_CMP_KEY());
-		}
+
+	workerPool.doWorkForEach((uint32)1, inf.maxVar, [this](uint32 v) {
+		assert(v);
+		uint32 p = V2L(v), n = NEG(p);
+		OL& poss = ot[p], & negs = ot[n];
+		std::sort(poss.data(), poss.data() + poss.size(), CNF_CMP_KEY());
+		std::sort(negs.data(), negs.data() + negs.size(), CNF_CMP_KEY());
 	});
 
 	workerPool.join();
@@ -171,11 +166,11 @@ void ParaFROST::sigmify()
 			// TODO
 
 			// Stage 3
+			sortOT();
 			if (phase == 0) CE();
 
 			// Stage 4
 			if (!LCVE()) break;
-			sortOT();
 			if (stop(diff)) { ERE(); break; }
 			HSE(), VE(), BCE();
 

@@ -826,7 +826,6 @@ namespace SIGmA {
 	{
 		for (S_REF* j = begin; j < end; j++) {
 			S_REF d = *j;
-			uint32 lit = 0;
 			if (d->deleted()) continue;
 			if (d->size() >= c->size()) break;
 			if (d->size() > 1 && subset_sig(d->sig(), c->sig()) && subset(d, c)) {
@@ -909,30 +908,15 @@ namespace SIGmA {
 
 		// HSE
 		if (opts.hse_en && c->size() <= HSE_MAX_CL_SIZE) {
-			for (uint32 k = 0; k < c->size() && !c->deleted(); k++) {
+			for (int k = 0; k < c->size() && !c->deleted(); k++) {
 				OL& ol = ot[c->lit(k)];
-				if (ol.size() > opts.hse_limit) continue;
-
-				for (int j = 0; j < ol.size(); j++) {
-					S_REF d = ol[j];
-					if (d->deleted()) continue;
-					if (d->size() >= c->size()) continue;
-					if (d->size() > 1 && subset_sig(d->sig(), c->sig()) && subset(d, c)) {
-						if (d->learnt() && c->original()) d->set_status(ORIGINAL);
-#if HSE_DBG
-						PFLCLAUSE(1, (*neg), " Clause ");
-						PFLCLAUSE(1, (*sm_c), " Subsumed by ");
-#endif 
-						c->markDeleted();
-						break;
-					}
-				}
+				if (ol.size() <= opts.hse_limit) sub_x(c, ol.data(), ol.data() + ol.size());
 			}
 		}
 
 		// BCE
 		if (opts.bce_en && !c->learnt()) {
-			for (uint32 k = 0; k < c->size() && !c->deleted(); k++) {
+			for (int k = 0; k < c->size() && !c->deleted(); k++) {
 				OL& ol = ot[FLIP(c->lit(k))];
 				if (ol.size() <= opts.bce_limit) blocked_x(ABS(c->lit(k)), c, ol);
 			}
