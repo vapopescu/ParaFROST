@@ -107,9 +107,8 @@ void ParaFROST::CE()
 		PFLOGN2(2, "  Eliminating clauses..");
 		if (opts.profile_simp) timer.pstart();
 
-		workerPool.doWorkForEach((size_t)0, scnf.size(), [&](size_t idx) {
-			S_REF c = scnf[idx];
-			clause_elim(c, ot, opts);
+		workerPool.doWorkForEach((size_t)0, scnf.size(), [this](size_t idx) {
+			clause_elim(scnf[idx], ot, opts);
 		});
 
 		workerPool.join();
