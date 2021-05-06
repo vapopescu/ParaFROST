@@ -28,7 +28,7 @@ namespace pFROST {
 
 	class WorkerPool {
 	protected:
-		const unsigned int			_MAX_BATCH_SIZE_ = 128;
+		const unsigned int			_MAX_BATCH_SIZE_ = 1024;
 		std::vector<std::thread>	_workers;
 		std::vector<Job>			_jobQueue;
 		std::mutex					_mutex;
