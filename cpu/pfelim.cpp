@@ -125,6 +125,8 @@ void ParaFROST::bve()
 	std::atomic<uint32> ti = 0;
 	std::vector<uVec1D> resolved(PVs.size());
 	std::vector<SCNF> new_res(PVs.size());
+	OL resColl;
+	uVec1D updLits;
 
 	workerPool.doWork([&] {
 		Lits_t out_c;
@@ -189,9 +191,9 @@ void ParaFROST::bve()
 	});
 
 	workerPool.join();
-	uint32 res = 0;
+	uint32 resLit = 0;
 	for (uint32 i = 0; i < PVs.size(); i++) {
-		res += resolved[i].size();
+		resLit += resolved[i].size();
 	}
 
 	uint32 resNum = 0;
@@ -199,16 +201,48 @@ void ParaFROST::bve()
 		resNum += new_res[i].size();
 	}
 
-	model.resolved.reserve(model.resolved.size() + res);
+	model.resolved.reserve(model.resolved.size() + resLit);
 	for (uint32 i = 0; i < PVs.size(); i++) {
 		for (int j = 0; j < resolved[i].size(); j++) {
 			model.resolved.push(resolved[i][j]);
 		}
 		for (int j = 0; j < new_res[i].size(); j++) {
-			newResolvent(new_res[i][j]);
+			S_REF c = new_res[i][j];
+			newResolvent(c);
+			resColl.push(c);
 		}
 		resolved[i].clear(true);
 		new_res[i].clear(true);
+	}
+
+	if (opts.ce_en) {
+		workerPool.doWorkForEach(0, resColl.size(), 16, [&](int i) {
+			S_REF c = resColl[i];
+			for (int k = 0; k < c->size(); k++) {
+				uint32 lit = c->lit(k);
+				ot[lit].lock(); ot[lit].push(c); ot[lit].unlock();
+				updLits.lock(); updLits.push(lit); updLits.unlock();
+			}
+		});
+		workerPool.join();
+
+		std::sort(updLits.data(), updLits.data() + updLits.size());
+		uint32 n = 0;
+		for (uint32 i = 1; i < updLits.size(); i++) {
+			uint32 lit = updLits[i];
+			if (lit != updLits[n]) updLits[n++];
+		}
+
+		workerPool.doWorkForEach((uint32)0, updLits.size(), [&](uint32 i) {
+			uint32 lit = updLits[i];
+			std::sort(ot[lit].data(), ot[lit].data() + ot[lit].size(), CNF_CMP_KEY());
+		});
+		workerPool.join();
+
+		workerPool.doWorkForEach(0, resColl.size(), 16, [&](int i) {
+			clause_elim(resColl[i], ot, opts);
+		});
+		workerPool.join();
 	}
 
 	if (opts.profile_simp) timer.pstop(), timer.ve += timer.pcpuTime();
