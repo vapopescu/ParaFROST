@@ -186,6 +186,13 @@ void ParaFROST::bve()
 					sp->vstate[v] = MELTED, v = 0;
 				}
 			}
+
+			for (uint32 j = 0; j < new_res[i].size(); j++) {
+				new_res[i][j]->calcSig();
+				new_res[i][j]->set_status(ORIGINAL);
+				clause_elim(new_res[i][j], ot, opts);
+				new_res[i][j]->set_status(0);
+			}
 		}
 	});
 
@@ -201,7 +208,7 @@ void ParaFROST::bve()
 			model.resolved.push(resolved[i][j]);
 		}
 		for (int j = 0; j < new_res[i].size(); j++) {
-			newResolvent(new_res[i][j]);
+			if (!new_res[i][j]->deleted()) newResolvent(new_res[i][j]);
 		}
 		resolved[i].clear(true);
 		new_res[i].clear(true);
@@ -222,7 +229,7 @@ void ParaFROST::VE()
 
 void ParaFROST::HSE()
 {
-	if (!opts.ce_en && (opts.hse_en || opts.ve_plus_en)) {
+	if ((!opts.ce_en || live) && (opts.hse_en || opts.ve_plus_en)) {
 		if (interrupted()) killSolver();
 		PFLOGN2(2, "  Eliminating (self)-subsumptions..");
 		if (opts.profile_simp) timer.pstart();
@@ -250,7 +257,7 @@ void ParaFROST::HSE()
 
 void ParaFROST::BCE()
 {
-	if (!opts.ce_en && opts.bce_en) {
+	if ((!opts.ce_en || live) && opts.bce_en) {
 		if (interrupted()) killSolver();
 		PFLOGN2(2, " Eliminating blocked clauses..");
 		if (opts.profile_simp) timer.pstart();

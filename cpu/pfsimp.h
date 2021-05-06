@@ -948,9 +948,9 @@ namespace SIGmA {
 		if (c->deleted())
 			for (uint32 k = 0; k < c->size(); k++) {
 				OL& ol = ot[c->lit(k)];
-				ol.lock(); 
-				updateOL(ol); 
-				ol.unlock(); 
+				ol.lock();
+				updateOL(ol);
+				ol.unlock();
 			}
 	}
 
