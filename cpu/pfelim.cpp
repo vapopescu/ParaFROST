@@ -237,7 +237,7 @@ void ParaFROST::HSE()
 				assert(sp->vstate[v] == ACTIVE);
 				uint32 p = V2L(v), n = NEG(p);
 				if (ot[p].size() <= opts.hse_limit && ot[n].size() <= opts.hse_limit)
-					self_sub_x(ot[p], ot[n]);
+					self_sub_x(p, ot[p], ot[n]);
 			}
 		});
 

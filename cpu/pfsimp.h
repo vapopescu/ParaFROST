@@ -254,12 +254,11 @@ namespace SIGmA {
 		}
 	}
 
-	inline bool subset_sig(const uint32& A, const uint32& B) { return !(A & ~B); }
+	inline bool subset_sig(const uint64& A, const uint64& B) { return !(A & ~B); }
 
-	inline bool selfSubset_sig(const uint32& A, const uint32& B)
+	inline bool selfSubset_sig(const uint32& lit, const uint64& A, const uint64& B)
 	{
-		uint32 B_tmp = B | ((B & 0xAAAAAAAAUL) >> 1) | ((B & 0x55555555UL) << 1);
-		return !(A & ~B_tmp);
+		return !(A & ~(B | MAPHASH(FLIP(lit))));
 	}
 
 	inline bool isEqual(const SCLAUSE& c1, const Lits_t& c2)
@@ -359,7 +358,7 @@ namespace SIGmA {
 		return false;
 	}
 
-	inline bool selfSubset(const S_REF sm, const S_REF lr, uint32& lit)
+	inline bool selfSubset(const uint32 lit, const S_REF sm, const S_REF lr)
 	{
 		assert(!sm->deleted());
 		assert(!lr->deleted());
@@ -369,11 +368,7 @@ namespace SIGmA {
 		int it1 = 0, it2 = 0, sub = 0;
 		bool self = false;
 		while (it1 < sm->size() && it2 < lr->size()) {
-			if (!self && sm->lit(it1) == FLIP(lr->lit(it2))) {
-				lit = lr->lit(it2);
-				self = true;
-				it1++; it2++;
-			}
+			if (FLIP(lit) == sm->lit(it1) && lit == lr->lit(it2)) { self = true; it1++; it2++; }
 			else if (sm->lit(it1) < lr->lit(it2)) return false;
 			else if (lr->lit(it2) < sm->lit(it1)) it2++;
 			else { sub++; it1++; it2++; }
@@ -846,14 +841,14 @@ namespace SIGmA {
 		}
 	}
 
-	inline void self_sub_x(S_REF& c, OL& other)
+	inline void self_sub_x(const uint32& lit, S_REF& c, OL& other)
 	{
 		for (int j = 0; j < other.size(); j++) {
 			S_REF d = other[j];
 			uint32 lit = 0;
 			if (d->deleted()) continue;
 			if (d->size() > c->size()) break;
-			if (d->size() > 1 && selfSubset_sig(d->sig(), c->sig()) && selfSubset(d, c, lit)) {
+			if (d->size() > 1 && selfSubset_sig(lit, d->sig(), c->sig()) && selfSubset(lit, d, c)) {
 #if HSE_DBG
 				PFLCLAUSE(1, (*c), " Clause ");
 				PFLCLAUSE(1, (*d), " Strengthened by ");
@@ -865,14 +860,14 @@ namespace SIGmA {
 		}
 	}
 
-	inline void self_sub_x(OL& poss, OL& negs)
+	inline void self_sub_x(const uint32& p, OL& poss, OL& negs)
 	{
 		assert(checkMolten(poss, negs));
 		for (int i = 0; i < poss.size(); i++) {
 			S_REF c = poss[i];
 			if (c->size() > HSE_MAX_CL_SIZE) break;
 			if (c->deleted()) continue;
-			self_sub_x(c, negs);
+			self_sub_x(p, c, negs);
 			sub_x(c, poss.data(), &poss[i]);
 		}
 		updateOL(poss);
@@ -880,7 +875,7 @@ namespace SIGmA {
 			S_REF c = negs[i];
 			if (c->size() > HSE_MAX_CL_SIZE) break;
 			if (c->deleted()) continue;
-			self_sub_x(c, poss);
+			self_sub_x(NEG(p), c, poss);
 			sub_x(c, negs.data(), &negs[i]);
 		}
 		updateOL(negs);

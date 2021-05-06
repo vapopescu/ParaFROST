@@ -28,7 +28,7 @@ namespace pFROST {
 	/*****************************************************/
 	class SCLAUSE {
 		uint32* _lits;
-		uint32 _sig;
+		uint64 _sig;
 		int _sz, _lbd;
 		CL_ST _st, _f;
 	public:
@@ -146,7 +146,7 @@ namespace pFROST {
 			else if (added()) st = 'A';
 			else if (original()) st = 'O';
 			else if (learnt()) st = 'L';
-			printf(") %c:%d, used=%d, lbd=%d, s=0x%X\n", st, molten(), usage(), _lbd, _sig);
+			printf(") %c:%d, used=%d, lbd=%d, s=0x%zX\n", st, molten(), usage(), _lbd, _sig);
 		}
 	};
 	typedef SCLAUSE* S_REF;

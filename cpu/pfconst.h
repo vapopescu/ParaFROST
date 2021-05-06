@@ -29,9 +29,9 @@ namespace pFROST {
 //=======================================//
 //      ParaFROST Parameters & Macros    //
 //=======================================//
-#define MBYTE 0x00100000
-#define KBYTE 0x00000400
-#define GBYTE 0x40000000
+#define MBYTE 0x00100000UL
+#define KBYTE 0x00000400UL
+#define GBYTE 0x40000000UL
 #define NOREF UINT64_MAX
 #define NOVAR UINT32_MAX
 #define INIT_CAP 32
@@ -47,8 +47,8 @@ namespace pFROST {
 #define AWAKEN_FAIL 1
 #define SALLOC_FAIL 2
 //======== DANGER ZONE =========
-#define NEG_SIGN	0x00000001
-#define HASH_MASK	0x0000001F
+#define NEG_SIGN	0x00000001UL
+#define HASH_MASK	0x000000000000003FULL
 #define NOVAL_MASK	(LIT_ST)-2
 #define UNDEFINED	(LIT_ST)-1
 #define VAL_MASK	(LIT_ST) 1
@@ -79,7 +79,7 @@ namespace pFROST {
 #define V2DEC(x,s)		(V2L(x) | (s))
 #define FLIP(x)			((x) ^ NEG_SIGN)
 #define HASH(x)			((x) & HASH_MASK)
-#define MAPHASH(x)		(1UL << HASH(x))
+#define MAPHASH(x)		(1ULL << HASH(x))
 #define	REMOVABLE(x)	((x) & REMOVABLE_M)	
 #define	POISONED(x)		((x) & POISONED_M)
 #define	KEPT(x)			((x) & KEEP_M)
