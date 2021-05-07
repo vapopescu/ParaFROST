@@ -217,10 +217,6 @@ void ParaFROST::bve()
 		new_res[i].clear(true);
 	}
 
-	if (opts.ce_en) {
-		// TODO eliminate redundant resolvents.
-	}
-
 	if (opts.profile_simp) timer.pstop(), timer.ve += timer.pcpuTime();
 }
 
