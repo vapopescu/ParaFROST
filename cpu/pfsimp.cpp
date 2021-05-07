@@ -167,7 +167,7 @@ void ParaFROST::sigmify()
 
 			// Stage 3
 			sortOT();
-			if (phase == 0) CE();
+			CE();
 
 			// Stage 4
 			if (!LCVE()) break;
@@ -184,7 +184,6 @@ void ParaFROST::sigmify()
 		/********************************/
 		/*          Write Back          */
 		/********************************/
-		live = true;
 		assert(sp->propagated == trail.size());
 		if (interrupted()) killSolver();
 		occurs.clear(true), ot.clear(true);

@@ -47,11 +47,12 @@ namespace SIGmA {
 	// OT sorting comparator
 	struct CNF_CMP_KEY {
 		bool operator () (S_REF x, S_REF y) {
-			if (x->size() != y->size()) return x->size() < y->size();
-			else if (x->lit(0) != y->lit(0)) return x->lit(0) < y->lit(0);
-			else if (x->lit(1) != y->lit(1)) return x->lit(1) < y->lit(1);
-			else if (x->size() > 2 && x->back() != y->back()) return x->back() < y->back();
-			else return x->sig() < y->sig();
+			if (x == y) return false;
+			else if (x->size() != y->size()) return x->size() < y->size();
+			else for (int k = 0; k < x->size(); k++) {
+				if (x->lit(k) != y->lit(k)) return x->lit(k) < y->lit(k);
+			}
+			return false;
 		}
 	};
 	struct CNF_CMP_SZ {
@@ -343,7 +344,7 @@ namespace SIGmA {
 
 	inline bool subset(const S_REF sm, const S_REF lr)
 	{
-		// assert(!sm->deleted());
+		assert(!sm->deleted());
 		assert(!lr->deleted());
 		assert(sm->size() > 1);
 		assert(lr->size() > 1);
@@ -518,7 +519,7 @@ namespace SIGmA {
 		nAddedCls = pOrgs * nOrgs - nTs;
 	}
 
-	inline void	saveResolved(uVec1D& resolved, const uint32& lit) { resolved.push(lit), resolved.push(1); }
+	inline void	saveResolved(uVec1D& resolved, const uint32& lit) { resolved.push(lit); }
 
 	inline void	saveResolved(uVec1D& resolved, SCLAUSE& c, const uint32& x)
 	{
@@ -533,7 +534,6 @@ namespace SIGmA {
 		}
 		assert(pos >= 0);
 		if (pos) swap(resolved[pos + last], resolved[last]);
-		resolved.push(c.size());
 	}
 
 	inline void saveResolved(const uint32& p, const int& pOrgs, const int& nOrgs, OL& poss, OL& negs, uVec1D& resolved)
@@ -822,10 +822,10 @@ namespace SIGmA {
 		return true;
 	}
 
-	inline void sub_x(S_REF& c, S_REF* begin, S_REF* end)
+	inline void sub_x(S_REF& c, OL& other)
 	{
-		for (S_REF* j = begin; j < end; j++) {
-			S_REF d = *j;
+		for (uint32 j = 0; j < other.size(); j++) {
+			S_REF d = other[j];
 			if (d->deleted()) continue;
 			if (d->size() >= c->size()) break;
 			if (d->size() > 1 && subset_sig(d->sig(), c->sig()) && subset(d, c)) {
@@ -867,7 +867,7 @@ namespace SIGmA {
 			if (c->size() > HSE_MAX_CL_SIZE) break;
 			if (c->deleted()) continue;
 			self_sub_x(p, c, negs);
-			sub_x(c, poss.data(), &poss[i]);
+			sub_x(c, poss);
 		}
 		updateOL(poss);
 		for (int i = 0; i < negs.size(); i++) {
@@ -875,14 +875,14 @@ namespace SIGmA {
 			if (c->size() > HSE_MAX_CL_SIZE) break;
 			if (c->deleted()) continue;
 			self_sub_x(NEG(p), c, poss);
-			sub_x(c, negs.data(), &negs[i]);
+			sub_x(c, negs);
 		}
 		updateOL(negs);
 		assert(checkMolten(poss, negs));
 		assert(checkDeleted(poss, negs));
 	}
 
-	inline void blocked_x(const uint32& x, S_REF& c, OL& other)
+	inline bool is_blocked_x(const uint32& x, S_REF& c, OL& other)
 	{
 		bool allTautology = true;
 		for (int j = 0; j < other.size(); j++) {
@@ -890,7 +890,7 @@ namespace SIGmA {
 			if (d->deleted() || d->learnt()) continue;
 			if (!isTautology(x, c, d)) { allTautology = false; break; }
 		}
-		if (allTautology) c->markDeleted();
+		return allTautology;
 	}
 
 	inline void blocked_x(const uint32& x, OL& me, OL& other)
@@ -898,27 +898,57 @@ namespace SIGmA {
 		for (int i = 0; i < me.size(); i++) {
 			S_REF c = me[i];
 			if (c->deleted() || c->learnt()) continue;
-			blocked_x(x, c, other);
+			if (is_blocked_x(x, c, other)) c->markDeleted();;
 		}
 	}
 
 	inline void clause_elim(S_REF& c, OT& ot, const OPTION& opts)
 	{
-		if (c->deleted() || c->size() <= 2) return;
+		if (c->size() <= 2) return;
 
-		// HSE
-		if (opts.hse_en && c->size() <= HSE_MAX_CL_SIZE) {
-			for (int k = 0; k < c->size() && !c->deleted(); k++) {
+		// FSE
+		if (opts.hse_en && !c->deleted() && c->size() <= HSE_MAX_CL_SIZE) {
+			CNF_CMP_KEY less;
+			OL subsumed;
+			subsumed.copyFrom(ot[c->lit(0)]);
+
+			for (int k = 1; k < c->size() && !subsumed.empty(); k++) {
 				OL& ol = ot[c->lit(k)];
-				if (ol.size() <= opts.hse_limit) sub_x(c, ol.data(), ol.data() + ol.size());
+				uint32 n = 0;
+				for (uint32 i = 0, j = i; i < subsumed.size() && j < ol.size(); ) {
+					if (less(subsumed[i], ol[j])) i++;
+					else if (less(ol[j], subsumed[i])) j++;
+					else if (subsumed[i] != c) { subsumed[n++] = subsumed[i++]; j++; }
+					else { i++; j++; }
+				}
+				subsumed.resize(n);
 			}
+
+			bool promote = false;
+			c->lock();
+			if (!c->deleted()) {
+				for (uint32 i = 0; i < subsumed.size(); i++) {
+					S_REF d = subsumed[i];
+					if (d->tryLock()) {
+						if (!d->deleted()) {
+							if (d->original()) promote = true;
+							assert(!subset(c, d));
+							if (c->size() < d->size()) d->markDeleted();
+						}
+						d->unlock();
+					}
+				}
+			}
+			if (promote) c->set_status(ORIGINAL);
+			c->unlock();
 		}
 
 		// BCE
-		if (opts.bce_en && !c->learnt()) {
+		if (opts.bce_en && !c->deleted() && !c->learnt()) {
 			for (int k = 0; k < c->size() && !c->deleted(); k++) {
 				OL& ol = ot[FLIP(c->lit(k))];
-				if (ol.size() <= opts.bce_limit) blocked_x(ABS(c->lit(k)), c, ol);
+				if (ol.size() <= opts.bce_limit && is_blocked_x(ABS(c->lit(k)), c, ol))
+					c->markDeleted();
 			}
 		}
 	}

@@ -31,6 +31,7 @@ namespace pFROST {
 		uint64 _sig;
 		int _sz, _lbd;
 		CL_ST _st, _f;
+		std::mutex _m;
 	public:
 		SCLAUSE		() { _lits = NULL, _sz = 0, _sig = 0, _st = 0, _f = 0; }
 		~SCLAUSE	() { clear(true); }
@@ -79,6 +80,9 @@ namespace pFROST {
 		inline uint32*	end			() { return _lits + _sz; }
 		inline uint32	back		() { return _lits[_sz - 1]; }
 		inline void		pop			() { _sz--; }
+		inline void		lock		() { _m.lock(); }
+		inline bool		tryLock		() { return _m.try_lock(); }
+		inline void		unlock		() { _m.unlock(); }
 		inline void		markDeleted	() { _st = DELETED; }
 		inline void		markAdded	() { _f |= CADDED; }
 		inline void		melt		() { _f |= CMOLTEN; }

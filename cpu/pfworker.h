@@ -121,7 +121,7 @@ namespace pFROST {
 		template<class IntType, class Function>
 		inline void doWorkForEach(const IntType& begin, const IntType& end, const Function& job)
 		{
-			doWorkForEach(begin, end, (IntType)0, job);
+			doWorkForEach(begin, end, (IntType)256, job);
 		}
 
 		inline void join() {

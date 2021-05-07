@@ -102,7 +102,7 @@ bool ParaFROST::prop()
 
 void ParaFROST::CE()
 {
-	if (!live && opts.ce_en && (opts.hse_en || opts.bce_en)) {
+	if (phase == 0 && opts.ce_en && (opts.hse_en || opts.bce_en)) {
 		if (interrupted()) killSolver();
 		PFLOGN2(2, "  Eliminating clauses..");
 		if (opts.profile_simp) timer.pstart();
@@ -125,8 +125,7 @@ void ParaFROST::bve()
 	std::atomic<uint32> ti = 0;
 	std::vector<uVec1D> resolved(PVs.size());
 	std::vector<SCNF> new_res(PVs.size());
-	OL resColl;
-	uVec1D updLits;
+	OL resolvents;
 
 	workerPool.doWork([&] {
 		Lits_t out_c;
@@ -201,48 +200,25 @@ void ParaFROST::bve()
 		resNum += new_res[i].size();
 	}
 
-	model.resolved.reserve(model.resolved.size() + resLit);
+	model.resolved.reserve(model.resolved.size() + resLit + 1);
 	for (uint32 i = 0; i < PVs.size(); i++) {
 		for (int j = 0; j < resolved[i].size(); j++) {
 			model.resolved.push(resolved[i][j]);
 		}
+		model.resolved.push(resLit);
+
 		for (int j = 0; j < new_res[i].size(); j++) {
 			S_REF c = new_res[i][j];
 			newResolvent(c);
-			resColl.push(c);
+			resolvents.push(c);
 		}
+
 		resolved[i].clear(true);
 		new_res[i].clear(true);
 	}
 
 	if (opts.ce_en) {
-		workerPool.doWorkForEach(0, resColl.size(), 16, [&](int i) {
-			S_REF c = resColl[i];
-			for (int k = 0; k < c->size(); k++) {
-				uint32 lit = c->lit(k);
-				ot[lit].lock(); ot[lit].push(c); ot[lit].unlock();
-				updLits.lock(); updLits.push(lit); updLits.unlock();
-			}
-		});
-		workerPool.join();
-
-		std::sort(updLits.data(), updLits.data() + updLits.size());
-		uint32 n = 0;
-		for (uint32 i = 1; i < updLits.size(); i++) {
-			uint32 lit = updLits[i];
-			if (lit != updLits[n]) updLits[n++];
-		}
-
-		workerPool.doWorkForEach((uint32)0, updLits.size(), [&](uint32 i) {
-			uint32 lit = updLits[i];
-			std::sort(ot[lit].data(), ot[lit].data() + ot[lit].size(), CNF_CMP_KEY());
-		});
-		workerPool.join();
-
-		workerPool.doWorkForEach(0, resColl.size(), 16, [&](int i) {
-			clause_elim(resColl[i], ot, opts);
-		});
-		workerPool.join();
+		// TODO eliminate redundant resolvents.
 	}
 
 	if (opts.profile_simp) timer.pstop(), timer.ve += timer.pcpuTime();
@@ -260,7 +236,7 @@ void ParaFROST::VE()
 
 void ParaFROST::HSE()
 {
-	if ((!opts.ce_en || live) && (opts.hse_en || opts.ve_plus_en)) {
+	if (!opts.ce_en && (opts.hse_en || opts.ve_plus_en)) {
 		if (interrupted()) killSolver();
 		PFLOGN2(2, "  Eliminating (self)-subsumptions..");
 		if (opts.profile_simp) timer.pstart();
@@ -288,7 +264,7 @@ void ParaFROST::HSE()
 
 void ParaFROST::BCE()
 {
-	if ((!opts.ce_en || live) && opts.bce_en) {
+	if (!opts.ce_en && opts.bce_en) {
 		if (interrupted()) killSolver();
 		PFLOGN2(2, " Eliminating blocked clauses..");
 		if (opts.profile_simp) timer.pstart();

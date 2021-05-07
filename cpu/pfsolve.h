@@ -468,7 +468,6 @@ namespace pFROST {
 		OT			ot;
 		uint32		mu_inc;
 		bool		mapped;
-		bool		live;
 		int			phase, nForced, sigState;
 	public:
 		//============= inline methods ==============//

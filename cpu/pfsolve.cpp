@@ -38,7 +38,6 @@ ParaFROST::ParaFROST(const string& _path) :
 	, conflict(NOREF)
 	, cnfstate(UNSOLVED)
 	, sigState(AWAKEN_SUCC)
-	, live(false)
 {
 	opts.init();
 	stats.sysMemAvail = getAvailSysMem();
