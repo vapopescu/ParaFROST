@@ -45,7 +45,7 @@ namespace SIGmA {
 #endif
 
 	// OT sorting comparator
-	struct CNF_CMP_KEY {
+	struct CNF_CMP_ABS {
 		bool operator () (S_REF x, S_REF y) {
 			if (x == y) return false;
 			else if (x->size() != y->size()) return x->size() < y->size();
@@ -53,6 +53,15 @@ namespace SIGmA {
 				if (x->lit(k) != y->lit(k)) return x->lit(k) < y->lit(k);
 			}
 			return false;
+		}
+	};
+	struct CNF_CMP_KEY {
+		bool operator () (S_REF x, S_REF y) {
+			if (x->size() != y->size()) return x->size() < y->size();
+			else if (x->lit(0) != y->lit(0)) return x->lit(0) < y->lit(0);
+			else if (x->lit(1) != y->lit(1)) return x->lit(1) < y->lit(1);
+			else if (x->size() > 2 && x->back() != y->back()) return x->back() < y->back();
+			else return x->sig() < y->sig();
 		}
 	};
 	struct CNF_CMP_SZ {
@@ -908,7 +917,7 @@ namespace SIGmA {
 
 		// FSE
 		if (opts.hse_en && !c->deleted() && c->size() <= HSE_MAX_CL_SIZE) {
-			CNF_CMP_KEY less;
+			CNF_CMP_ABS less;
 			OL subsumed;
 			subsumed.copyFrom(ot[c->lit(0)]);
 
