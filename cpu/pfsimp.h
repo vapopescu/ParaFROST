@@ -49,6 +49,7 @@ namespace SIGmA {
 		bool operator () (S_REF x, S_REF y) {
 			if (x == y) return false;
 			else if (x->size() != y->size()) return x->size() < y->size();
+			else if (x->sig() != y->sig()) return x->sig() < y->sig();
 			else for (int k = 0; k < x->size(); k++) {
 				if (x->lit(k) != y->lit(k)) return x->lit(k) < y->lit(k);
 			}
