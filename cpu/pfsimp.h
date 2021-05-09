@@ -926,8 +926,9 @@ namespace SIGmA {
 				OL& ol = ot[c->lit(k)];
 				uint32 n = 0;
 				for (uint32 i = 0, j = i; i < subsumed.size() && j < ol.size(); ) {
-					if (less(subsumed[i], ol[j])) i++;
-					else if (less(ol[j], subsumed[i])) j++;
+					S_REF& c = subsumed[i], & d = ol[j];
+					if (c->deleted() || less(c, d)) i++;
+					else if (d->deleted() || less(d, c)) j++;
 					else if (subsumed[i] != c) { subsumed[n++] = subsumed[i++]; j++; }
 					else { i++; j++; }
 				}
