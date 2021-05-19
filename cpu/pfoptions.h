@@ -80,12 +80,14 @@ namespace pFROST {
 		bool	hse_en;
 		bool	bce_en;
 		bool	ere_en;
+		bool	igr_en;
+		bool	hla_en;
+		bool	ce_en;
 		bool	all_en;
 		bool	solve_en;
 		bool	aggr_cnf_sort;
 		bool	profile_simp;
 		bool	ve_en, ve_plus_en;
-		bool	ce_en;
 		bool	sigma_en, sigma_live_en;
 		//------------------------------------------//
 		int		phases;

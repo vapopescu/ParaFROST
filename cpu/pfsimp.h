@@ -22,10 +22,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfsort.h"
 #include "pfsolve.h"
 #include "pfrange.h"
+#include "pfpath.h"
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
 #include <functional>
+#include <list>
 
 using namespace pFROST;
 
@@ -919,8 +921,7 @@ namespace SIGmA {
 		// FSE
 		if (opts.hse_en && !c->deleted() && c->size() <= HSE_MAX_CL_SIZE) {
 			CNF_CMP_ABS less;
-			OL subsumed;
-			subsumed.copyFrom(ot[c->lit(0)]);
+			OL subsumed = OL(ot[c->lit(0)]);
 
 			for (int k = 1; k < c->size() && !subsumed.empty(); k++) {
 				OL& ol = ot[c->lit(k)];

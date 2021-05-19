@@ -49,23 +49,18 @@ namespace pFROST {
 		}
 	public:
 		__forceinline			~Vec		() { clear(true); }
-		__forceinline			Vec			() { maxCap = std::numeric_limits<S>::max(), _mem = NULL, sz = 0, cap = 0; }
-		__forceinline explicit	Vec			(const S& size) {
-			maxCap = std::numeric_limits<S>::max();
-			_mem = NULL, sz = 0, cap = 0; resize(size);
-		}
-		__forceinline			Vec			(const S& size, const T& val) {
-			maxCap = std::numeric_limits<S>::max();
-			_mem = NULL, sz = 0, cap = 0; resize(size, val);
-		}
+		__forceinline			Vec			() { init(); }
+		__forceinline			Vec			(const Vec<T, S>& orig) { init(); copyFrom(orig); }
+		__forceinline explicit	Vec			(const S& size) { init(); resize(size); }
+		__forceinline			Vec			(const S& size, const T& val) { init(); resize(size, val); }
 		__forceinline Vec<T>&	operator=	(Vec<T>& rhs) { return *this; }
 		__forceinline const T&	operator[]	(const S& index) const { assert(check(index)); return _mem[index]; }
 		__forceinline T&		operator[]	(const S& index) { assert(check(index)); return _mem[index]; }
 		__forceinline const T&	back		() const { assert(sz); return _mem[sz - 1]; }
 		__forceinline T&		back		() { assert(sz); return _mem[sz - 1]; }
 		__forceinline			operator T* () { return _mem; }
-		__forceinline T*		data		() { return _mem; }
-		__forceinline T*		end			() { return _mem + sz; }
+		__forceinline T*		data		() const { return _mem; }
+		__forceinline T*		end			() const { return _mem + sz; }
 		__forceinline bool		empty		() const { return !sz; }
 		__forceinline S			size		() const { return sz; }
 		__forceinline S			capacity	() const { return cap; }
@@ -75,6 +70,7 @@ namespace pFROST {
 		__forceinline void		reserve		(const S& min_cap, const S& size) { reserve(min_cap); sz = size; }
 		__forceinline void		lock		() { _m.lock(); }
 		__forceinline void		unlock		() { _m.unlock(); }
+		__forceinline void		init		() { maxCap = std::numeric_limits<S>::max(), _mem = NULL, sz = 0, cap = 0; }
 		__forceinline void		init		(const S& off, const S& n, const T& val) {
 			if (!val && !off) { std::memset(_mem, 0, n * sizeof(T)); }
 			else { for (S i = off; i < n; i++) _mem[i] = val; }
@@ -121,9 +117,9 @@ namespace pFROST {
 			pfshrinkAlloc(_mem, sizeof(T) * sz);
 			cap = sz;
 		}
-		__forceinline void		copyFrom	(Vec<T, S>& copy) {
+		__forceinline void		copyFrom	(const Vec<T, S>& copy) {
 			resize(copy.size());
-			std::memcpy(_mem, copy, sz * sizeof(T));
+			std::memcpy(_mem, copy.data(), sz * sizeof(T));
 		}
 		template<class SS = uint32>
 		__forceinline void		copyFrom	(T* copy, const SS& copy_sz) {
@@ -135,6 +131,41 @@ namespace pFROST {
 				for (S i = 0; i < sz; i++) _mem[i].~T();
 				sz = 0;
 				if (_free) { std::free(_mem); _mem = NULL; cap = 0; }
+			}
+		}
+		__forceinline void		unionize	(const Vec<T, S>& rhs) { unionize(rhs, std::less<T>()); }
+		template<class Comparator>
+		__forceinline void		unionize	(const Vec<T,S>& rhs, Comparator less) {
+			if (empty()) copyFrom(rhs);
+			else if (!rhs.empty()) {
+				Vec<T, S> lhs = Vec<T, S>(*this);
+				expand(lhs.size() + rhs.size());
+
+				S i = 0, j = 0, k = 0;
+				while (i < lhs.size() && j < rhs.size()) {
+					if (less(lhs[i], rhs[j])) _mem[k++] = lhs[i++];
+					else if (less(rhs[j], lhs[i])) _mem[k++] = rhs[j++];
+					else { _mem[k++] = lhs[i++]; j++; }
+				}
+				while (i < lhs.size()) _mem[k++] = lhs[i++];
+				while (j < rhs.size()) _mem[k++] = rhs[j++];
+				resize(k);
+			}
+		}
+		__forceinline void		intersect	(const Vec<T, S>& rhs) { intersect(rhs, std::less<T>()); }
+		template<class Comparator>
+		__forceinline void		intersect	(const Vec<T, S>& rhs, Comparator less) {
+			if (empty() || rhs.empty()) clear(true);
+			else {
+				if (size() < rhs.size()) expand(rhs.size());
+
+				S i = 0, j = 0, k = 0;
+				while (i < size() && j < rhs.size()) {
+					if (less(_mem[i], rhs[j])) i++;
+					else if (less(rhs[j], _mem[i])) j++;
+					else { _mem[k++] = _mem[i++]; j++; }
+				}
+				resize(k);
 			}
 		}
 	};

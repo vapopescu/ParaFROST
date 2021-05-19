@@ -30,6 +30,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfvmap.h"
 #include "pfsolvertypes.h"
 #include "pfoptions.h"
+#include "pfnode.h"
 #include "pfworker.h"
 #include <atomic>
 
@@ -466,6 +467,7 @@ namespace pFROST {
 		uVec1D		PVs;
 		SCNF		scnf;
 		OT			ot;
+		IG			ig;
 		uint32		mu_inc;
 		bool		mapped;
 		int			phase, nForced, sigState;
@@ -621,6 +623,7 @@ namespace pFROST {
 		bool	LCVE				();
 		bool	prop				();
 		void	bve					();
+		void	IGR					();
 		void	CE					();
 		void	VE					();
 		void	HSE					();
@@ -631,7 +634,7 @@ namespace pFROST {
 		void	reduceOL			(OL&);
 		void	extract				(const BCNF&);
 		void	awaken				(const bool& = false);
-		void	createOT			(const bool& = true);
+		void	createOT	(const bool& = true);
 		bool	propClause			(S_REF, const uint32&);
 		void	strengthen			(S_REF, const uint32&);
 		void	newSClause			(S_REF);

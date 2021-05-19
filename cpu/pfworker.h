@@ -28,13 +28,13 @@ namespace pFROST {
 
 	class WorkerPool {
 	protected:
-		std::vector<std::thread>	_workers;
-		std::vector<Job>			_jobQueue;
-		std::mutex					_mutex;
-		std::condition_variable		_workerCV;
-		std::condition_variable		_poolCV;
-		bool						_terminate;
-		unsigned int				_waiting;
+		std::vector<std::thread>			_workers;
+		std::vector<Job>					_jobQueue;
+		mutable std::mutex					_mutex;
+		mutable std::condition_variable		_workerCV;
+		mutable std::condition_variable		_poolCV;
+		bool								_terminate;
+		unsigned int						_waiting;
 
 	public:
 		WorkerPool		()							{ init(std::thread::hardware_concurrency()); }
@@ -87,7 +87,7 @@ namespace pFROST {
 
 		inline unsigned int count() { return _workers.size(); }
 
-		inline void doWork(Job job)
+		inline void doWork(const Job& job)
 		{
 			std::unique_lock<std::mutex> lock(_mutex);
 
@@ -124,7 +124,7 @@ namespace pFROST {
 			doWorkForEach(begin, end, (IntType)256, job);
 		}
 
-		inline void join() {
+		inline void join() const {
 			std::unique_lock<std::mutex> lock(_mutex);
 			_poolCV.wait(lock, [this] { return _jobQueue.empty() && _waiting == _workers.size(); });
 		}

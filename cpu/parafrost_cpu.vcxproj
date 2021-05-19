@@ -120,8 +120,10 @@
     <ClInclude Include="pfkey.h" />
     <ClInclude Include="pflogging.h" />
     <ClInclude Include="pfmodel.h" />
+    <ClInclude Include="pfnode.h" />
     <ClInclude Include="pfoptions.h" />
     <ClInclude Include="pfparser.h" />
+    <ClInclude Include="pfpath.h" />
     <ClInclude Include="pfqueue.h" />
     <ClInclude Include="pfralloc.h" />
     <ClInclude Include="pfrandom.h" />

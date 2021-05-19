@@ -119,10 +119,11 @@ void ParaFROST::awaken(const bool& strict)
 	PFLOGN2(2, " Allocating memory..");
 	size_t numCls = maxClauses(), numLits = maxLiterals();
 	size_t ot_cap = inf.nDualVars * sizeof(OL) + numLits * sizeof(S_REF);
+	size_t ig_cap = inf.nDualVars * sizeof(IG);
 	size_t scnf_cap = numCls * sizeof(S_REF) + numLits * sizeof(uint32);
-	if (!checkMem("ot", ot_cap) || !checkMem("scnf", scnf_cap))
+	if (!checkMem("ot", ot_cap) || !checkMem("ig", ig_cap) || !checkMem("scnf", scnf_cap))
 	{ sigState = SALLOC_FAIL; return; }
-	ot.resize(inf.nDualVars), scnf.resize(numCls);
+	ot.resize(inf.nDualVars), ig.resize(inf.nDualVars), scnf.resize(numCls);
 	PFLENDING(2, 5, "(%.1f MB used)", double(ot_cap + scnf_cap) / MBYTE);
 	// append clauses to scnf
 	PFLOGN2(2, " Extracting clauses to simplifying CNF..");
@@ -169,7 +170,7 @@ void ParaFROST::sigmify()
 			if (!prop()) break;
 
 			// Stage 2
-			// TODO
+			IGR();
 
 			// Stage 3
 			sortOT();

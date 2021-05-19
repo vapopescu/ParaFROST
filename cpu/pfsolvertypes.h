@@ -22,6 +22,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfspace.h"
 #include "pfwatch.h"
 #include "pfsclause.h"
+#include "pfnode.h"
+#include "pfvec.h"
 #include <atomic>
 
 namespace pFROST {
@@ -35,6 +37,7 @@ namespace pFROST {
 	typedef Vec<C_REF, int> WOL;
 	typedef Vec<S_REF, int> OL;
 	typedef Vec<OL> OT;
+	typedef Vec<Node> IG;
 	typedef Vec<S_REF, size_t> SCNF;
 	/*****************************************************/
 	/*  Global structures and comparators		         */

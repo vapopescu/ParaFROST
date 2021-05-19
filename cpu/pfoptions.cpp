@@ -23,10 +23,12 @@ using namespace pFROST;
 // simplifier options
 BOOL_OPT opt_ve_en("ve", "enable bounded variable elimination (BVE)", true);
 BOOL_OPT opt_ve_plus_en("ve+", "enable HSE + BVE", true);
-BOOL_OPT opt_ce_en("ce", "enable clause elimination stage", true);
 BOOL_OPT opt_hse_en("hse", "enable hybrid subsumption elimination", true);
 BOOL_OPT opt_bce_en("bce", "enable blocked clause elimination", false);
 BOOL_OPT opt_ere_en("ere", "enable eager redundancy elimination", true);
+BOOL_OPT opt_igr_en("igr", "enable impication graph reasoning", true);
+BOOL_OPT opt_hla_en("hla", "enable hidden literal addition", true);
+BOOL_OPT opt_ce_en("ce", "enable clause elimination stage", true);
 BOOL_OPT opt_all_en("all", "enable all simplifications", false);
 BOOL_OPT opt_profile_simp_en("profilesimp", "profile simplifications", false);
 BOOL_OPT opt_aggr_cnf_sort("aggresivesort", "sort simplified formula with aggresive key before writing to host", false);
@@ -179,6 +181,7 @@ void OPTION::init() {
 		aggr_cnf_sort = opt_aggr_cnf_sort;
 		profile_simp = opt_profile_simp_en;
 		ve_plus_en = opt_ve_plus_en;
+		hla_en = opt_hla_en;
 		bce_en = opt_bce_en;
 		ere_en = opt_ere_en;
 		all_en = opt_all_en;
@@ -192,12 +195,13 @@ void OPTION::init() {
 		bce_limit = opt_bce_max_occurs;
 		ere_limit = opt_ere_max_occurs;
 		xor_max_arity = opt_xor_max_arity;
-		ve_en = opt_ve_en || ve_plus_en;
+		igr_en = opt_igr_en || hla_en;
 		ce_en = opt_ce_en;
+		ve_en = opt_ve_en || ve_plus_en;
 		hse_en = opt_hse_en || ve_plus_en;
-		if (all_en) ve_en = 1, ve_plus_en = 1, bce_en = 1, ere_en = 1;
-		if (!phases && (ve_en || hse_en || bce_en)) phases = 1; // at least 1 phase needed
-		if (phases && !(ve_en || hse_en || bce_en)) phases = 0;
+		if (all_en) igr_en = 1, ce_en = 1, ve_en = 1, ve_plus_en = 1, hla_en = 1, bce_en = 1, ere_en = 1;
+		if (!phases && (igr_en || ve_en || hse_en || bce_en)) phases = 1; // at least 1 phase needed
+		if (phases && !(igr_en || ve_en || hse_en || bce_en)) phases = 0;
 		if (phases > 1 && !ve_en) phases = 1;
 	}
 }
