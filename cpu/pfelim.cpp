@@ -124,7 +124,7 @@ void ParaFROST::IGR()
 		});
 
 		workerPool.join();
-		std::list<NodePath> queue;
+		std::deque<NodePath> queue;
 		std::mutex mQueue, mCycle;
 		std::condition_variable cv1, cv2;
 
@@ -195,9 +195,15 @@ void ParaFROST::IGR()
 							ig[c].lockRead();
 							if (!ig[c].isExplored()) {
 								childrenExplored = false;
-								std::unique_lock<std::mutex> lock(mQueue);
-								queue.push_front(NodePath(c, path));
-								cv1.notify_one();
+								if (!ig[lit].isVisited()) {
+									std::unique_lock<std::mutex> lock(mQueue);
+									queue.push_front(NodePath(c, path));
+									cv1.notify_one();
+								}
+								else {
+									ig[c].unlockRead();
+									break;
+								}
 							}
 							else if (childrenExplored) {
 								children.unionize(uVec1D(1, c));
@@ -210,6 +216,9 @@ void ParaFROST::IGR()
 
 					// Cannot procede if not all children are explored.
 					if (!childrenExplored) {
+						ig[lit].lock();
+						ig[lit].markVisited();
+						ig[lit].unlock();
 						np = NodePath(0, {});
 						break; // "return"
 					}

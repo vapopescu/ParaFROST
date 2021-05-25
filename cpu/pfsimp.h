@@ -27,7 +27,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <mutex>
 #include <condition_variable>
 #include <functional>
-#include <list>
+#include <deque>
 
 using namespace pFROST;
 
