@@ -914,12 +914,12 @@ namespace SIGmA {
 		}
 	}
 
-	inline void clause_elim(S_REF& c, OT& ot, const OPTION& opts)
+	inline void clause_elim(S_REF& c, OT& ot)
 	{
 		if (c->size() <= 2) return;
 
 		// FSE
-		if (opts.hse_en && !c->deleted() && c->size() <= HSE_MAX_CL_SIZE) {
+		if (pfrost->opts.hse_en && !c->deleted() && c->size() <= HSE_MAX_CL_SIZE) {
 			CNF_CMP_ABS less;
 			OL subsumed = OL(ot[c->lit(0)]);
 
@@ -956,13 +956,92 @@ namespace SIGmA {
 		}
 
 		// BCE
-		if (opts.bce_en && !c->deleted() && !c->learnt()) {
+		if (pfrost->opts.bce_en && !c->deleted() && !c->learnt()) {
 			for (int k = 0; k < c->size() && !c->deleted(); k++) {
 				OL& ol = ot[FLIP(c->lit(k))];
-				if (ol.size() <= opts.bce_limit && is_blocked_x(ABS(c->lit(k)), c, ol))
+				if (ol.size() <= pfrost->opts.bce_limit && is_blocked_x(ABS(c->lit(k)), c, ol))
 					c->markDeleted();
 			}
 		}
+	}
+
+	inline void clause_replace(const S_REF& c, const uint32& oldLit, const uint32& newLit, IG& ig)
+	{
+		bool duplicated = false;
+
+		// Replace literals avoiding duplication.
+		for (int k = 0; k < c->size(); k++) {
+			if (c->lit(k) == oldLit) {
+				(*c)[k] = newLit;
+			}
+			else if (c->lit(k) == newLit) {
+				(*c)[k] = inf.nDualVars;
+				duplicated = true;
+			}
+		}
+		std::sort(c->data(), c->data() + c->size());
+		if (duplicated) c->shrink(1);
+
+		// Tautology check.
+		for (int k = 1; k < c->size(); k++) {
+			if (c->lit(k) == FLIP(c->lit(k - 1))) {
+				c->markDeleted();
+				return;
+			}
+		}
+
+		// Update IG 
+		if (c->size() == 2) {
+			uint32 otherLit = 0;
+			if (c->lit(1) == oldLit) otherLit = c->lit(0);
+			else otherLit = c->lit(1);
+
+			if (!duplicated) {
+				ig[oldLit].lock(); ig[oldLit].deleteParent(FLIP(otherLit)); ig[oldLit].unlock();
+				ig[otherLit].lock(); ig[otherLit].deleteParent(FLIP(oldLit)); ig[otherLit].unlock();
+				ig[FLIP(oldLit)].lock(); ig[FLIP(oldLit)].deleteChild(otherLit); ig[FLIP(oldLit)].unlock();
+				ig[FLIP(otherLit)].lock(); ig[FLIP(otherLit)].deleteChild(oldLit); ig[FLIP(otherLit)].unlock();
+			}
+			else {
+				// TODO inform search about new binary clause.
+			}
+
+			ig[newLit].lock(); ig[newLit].appendParent(FLIP(otherLit), c); ig[newLit].sortEdges(); ig[newLit].unlock();
+			ig[otherLit].lock(); ig[otherLit].appendParent(FLIP(newLit), c); ig[otherLit].sortEdges(); ig[otherLit].unlock();
+			ig[FLIP(newLit)].lock(); ig[FLIP(newLit)].appendChild(otherLit, c); ig[FLIP(newLit)].sortEdges(); ig[FLIP(newLit)].unlock();
+			ig[FLIP(otherLit)].lock(); ig[FLIP(otherLit)].appendChild(newLit, c); ig[FLIP(otherLit)].sortEdges(); ig[FLIP(otherLit)].unlock();
+		}
+
+		// Update signature.
+		c->calcSig();
+	}
+
+	inline void node_reduce(const uint32& oldLit, const uint32& newLit, OT& ot, IG& ig)
+	{
+		ig[oldLit].lock();
+		if (!ig[oldLit].isReduced()) {
+
+			// Rewrite clauses.
+			for (int i = 0; i < ot[oldLit].size(); i++) {
+				if (!ot[oldLit][i]->deleted()) {
+					ig[oldLit].unlock();
+					clause_replace(ot[oldLit][i], oldLit, newLit, ig);
+					ig[oldLit].lock();
+				}
+			}
+
+			// Update occurence table.
+			ot[newLit].unionize(ot[oldLit]);
+			ot[oldLit].clear();
+
+			// Clear edges.
+			ig[oldLit].clear();
+
+			// Mark node as reduced and add reference to the node it was replaced with.
+			ig[oldLit].markReduced();
+			ig[oldLit].descendants().push(newLit);
+		}
+		ig[oldLit].unlock();
 	}
 
 }

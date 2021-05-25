@@ -76,9 +76,9 @@ namespace pFROST {
 		string			solLine;
 		std::ofstream	proofFile;
 		bool			intr;
+		WorkerPool		workerPool;
 	public:
 		OPTION			opts;
-		WorkerPool		workerPool;
 		//============== inline methods ===============
 		inline void		strengthen			(CLAUSE&, const uint32&);
 		inline int		removeRooted		(CLAUSE&);

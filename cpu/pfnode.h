@@ -25,7 +25,9 @@ namespace pFROST {
 	typedef std::pair<uint32, S_REF> Edge;
 	typedef unsigned char NodeState;
 
-	static const NodeState _EXPLORED_ = 0x01;
+	static const NodeState _VISITED_ = 0x01;
+	static const NodeState _EXPLORED_ = 0x02;
+	static const NodeState _REDUCED_ = 0x04;
 
 	class Node {
 	protected:
@@ -47,7 +49,16 @@ namespace pFROST {
 
 			vec[i] = Edge(lit, c);
 		}
-		inline bool empty(const Vec<Edge>& vec) const
+		inline void		deleteEdge		(Vec<Edge>& vec, const uint32& lit)
+		{
+			uint32 n = 0;
+			for (uint32 i = 0; i < vec.size(); i++) {
+				if (vec[i].first != lit) vec[n++] = vec[i];
+			}
+			assert(n + 1 == vec.size());
+			vec.resize(n);
+		}
+		inline bool		empty			(const Vec<Edge>& vec) const
 		{
 			bool retVal = true;
 			if (!vec.empty()) {
@@ -68,12 +79,18 @@ namespace pFROST {
 		inline void					unlock			() const { _m.unlock(); }
 		inline void					appendChild		(const uint32& lit, const S_REF& c) { appendEdge(_out, lit, c); }
 		inline void					insertChild		(const uint32& lit, const S_REF& c) { insertEdge(_out, lit, c); }
+		inline void					deleteChild		(const uint32& lit) { deleteEdge(_out, lit); }
 		inline void					appendParent	(const uint32& lit, const S_REF& c) { appendEdge(_in, lit, c); }
 		inline void					insertParent	(const uint32& lit, const S_REF& c) { insertEdge(_in, lit, c); }
+		inline void					deleteParent	(const uint32& lit) { deleteEdge(_in, lit); }
 		inline bool					isDeadEnd		() const { return empty(_out); }
 		inline bool					isOrphan		() const { return empty(_in); }
+		inline bool					isVisited		() const { return _st & _VISITED_; }
 		inline bool					isExplored		() const { return _st & _EXPLORED_; }
+		inline bool					isReduced		() const { return _st & _REDUCED_; }
+		inline void					markVisited		() { _st |= _VISITED_; }
 		inline void					markExplored	() { _st |= _EXPLORED_; }
+		inline void					markReduced		() { _st |= _REDUCED_; }
 		inline Vec<Edge>&			children		() { return _out; }
 		inline const Vec<Edge>&		children		() const { return _out; }
 		inline Vec<Edge>&			parents			() { return _in; }

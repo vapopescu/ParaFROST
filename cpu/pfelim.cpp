@@ -125,12 +125,12 @@ void ParaFROST::IGR()
 
 		workerPool.join();
 		std::list<NodePath> queue;
-		std::mutex m;
+		std::mutex mQueue, mCycle;
 		std::condition_variable cv1, cv2;
 
 		workerPool.doWorkForEach((uint32)2, inf.nDualVars, [&](uint32 lit) {
 			ig[lit].sortEdges();
-			if (ig[lit].isOrphan()) { std::unique_lock lock(m); queue.push_back(NodePath(lit, {})); }
+			if (ig[lit].isOrphan()) { std::unique_lock lock(mQueue); queue.push_back(NodePath(lit, {})); }
 		});
 
 		workerPool.join();
@@ -141,7 +141,7 @@ void ParaFROST::IGR()
 			NodePath np = NodePath(0, {});
 			while (true) {
 				if (np.first == 0) {
-					std::unique_lock<std::mutex> lock(m);
+					std::unique_lock<std::mutex> lock(mQueue);
 					std::function<bool()> condition = [&] { return !queue.empty() || terminate; };
 					if (!condition()) {
 						working--;
@@ -150,27 +150,41 @@ void ParaFROST::IGR()
 						working++;
 					}
 					if (terminate) break;
-					np = queue.back(); queue.pop_back();
+					np = queue.front(); queue.pop_front();
 				}
 
 				uint32& lit = np.first;
 				Path<uint32>& path = np.second;
 
-				do {
+				do { // visit()
 					ig[lit].lockRead();
 
+					// Early return. Nothing left to do.
 					if (ig[lit].isExplored()) {
 						ig[lit].unlockRead();
-						break;
+						break; // "return"
 					}
 
+					// Equivalence reduction.
 					if (path.itemSet().count(lit)) {
-						// TODO equivalence reduction
-						std::unique_lock lock(m);
-						PFLOGE(" IGR equivalence cycle detected, but reduction is not yet implemented. Impossible to continue! ");
-						break;
+						ig[lit].unlockRead();
+						uint32 targetLit = lit;
+						mCycle.lock();
+
+						do {
+							if (lit != targetLit) {
+								node_reduce(lit, targetLit, ot, ig);
+								node_reduce(FLIP(lit), FLIP(targetLit), ot, ig);
+							}
+							lit = path.back(); path.pop();
+						} while (lit != targetLit);
+
+						mCycle.unlock();
+						np = NodePath(0, {});
+						break; // "return"
 					}
 
+					// Explore children first.
 					Vec<Edge> cs = ig[lit].children();
 					uVec1D children;
 					bool childrenExplored = true;
@@ -181,8 +195,8 @@ void ParaFROST::IGR()
 							ig[c].lockRead();
 							if (!ig[c].isExplored()) {
 								childrenExplored = false;
-								std::unique_lock<std::mutex> lock(m);
-								queue.push_back(NodePath(c, path));
+								std::unique_lock<std::mutex> lock(mQueue);
+								queue.push_front(NodePath(c, path));
 								cv1.notify_one();
 							}
 							else if (childrenExplored) {
@@ -191,13 +205,15 @@ void ParaFROST::IGR()
 							ig[c].unlockRead();
 						}
 					}
-
 					path.pop();
 					ig[lit].unlockRead();
+
+					// Cannot procede if not all children are explored.
 					if (!childrenExplored) {
 						np = NodePath(0, {});
-						break;
+						break; // "return"
 					}
+
 					ig[lit].lock();
 					for (uint32 i = 0; i < cs.size(); i++) {
 						if (!cs[i].second->deleted()) {
@@ -205,6 +221,7 @@ void ParaFROST::IGR()
 							ig[c].lockRead();
 							bool redundant = false;
 
+							// Remove redundant edges.
 							for (uint32 j = 0; j < ig[lit].descendants().size(); j++) {
 								if (ig[lit].descendants()[j] < c) continue;
 								else if (ig[lit].descendants()[j] == c) {
@@ -220,14 +237,15 @@ void ParaFROST::IGR()
 								continue;
 							}
 
-							ig[lit].descendants().unionize(ig[c].descendants(), std::less<uint32>());
+							ig[lit].descendants().unionize(ig[c].descendants());
 							ig[c].unlockRead();
 						}
 					}
 
+					ig[lit].descendants().unionize(children);
 					ig[lit].markExplored();
 					ig[lit].unlock();
-				} while (false);
+				} while (false); // point to "return" to.
 
 				if (path.size() > 0) {
 					uint32 prev = path.back(); path.pop();
@@ -239,14 +257,14 @@ void ParaFROST::IGR()
 			}
 		});
 
-		std::unique_lock<std::mutex> lock(m);
+		std::unique_lock<std::mutex> lock(mQueue);
 		cv2.wait(lock, [&working] { return working == 0; });
 		terminate = true;
 		cv1.notify_all();
 		lock.unlock();
 		workerPool.join();
 
-		for (uint32 i = 2; i < inf.nDualVars; i++) {
+		/* for (uint32 i = 2; i < inf.nDualVars; i++) {
 			printf("ig[%d]:\n", i);
 			printf("\tparents: ");
 			for (uint32 j = 0; j < ig[i].parents().size(); j++) {
@@ -261,7 +279,7 @@ void ParaFROST::IGR()
 				printf("%d, ", ig[i].descendants()[j]);
 			}
 			printf("\n");
-		}
+		}*/
 
 		if (opts.profile_simp) timer.pstop(), timer.hse += timer.pcpuTime();
 		PFLDONE(2, 5);
@@ -276,7 +294,7 @@ void ParaFROST::CE()
 		if (opts.profile_simp) timer.pstart();
 
 		workerPool.doWorkForEach((size_t)0, scnf.size(), (size_t)64, [this](size_t i) {
-			clause_elim(scnf[i], ot, opts);
+			clause_elim(scnf[i], ot);
 		});
 
 		workerPool.join();
