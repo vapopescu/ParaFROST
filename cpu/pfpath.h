@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "pfdtypes.h"
 #include <list>
 #include <set>
 #include <algorithm>

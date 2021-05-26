@@ -22,12 +22,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfsort.h"
 #include "pfsolve.h"
 #include "pfrange.h"
-#include "pfpath.h"
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
 #include <functional>
 #include <deque>
+#include <vector>
 
 using namespace pFROST;
 
@@ -45,6 +45,8 @@ namespace SIGmA {
 #elif _WIN32
 #define COUNTFLIPS(X) while (__popcnt(++X) & 1); 
 #endif
+
+	typedef std::pair<uint32, uVec1D> NodePath;
 
 	// OT sorting comparator
 	struct CNF_CMP_ABS {

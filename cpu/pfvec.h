@@ -53,6 +53,7 @@ namespace pFROST {
 		__forceinline			Vec			(const Vec<T, S>& orig) { init(); copyFrom(orig); }
 		__forceinline explicit	Vec			(const S& size) { init(); resize(size); }
 		__forceinline			Vec			(const S& size, const T& val) { init(); resize(size, val); }
+		__forceinline			Vec			(const std::initializer_list<T>& src) { init(); copyFrom(src); }
 		__forceinline Vec<T>&	operator=	(Vec<T>& rhs) { return *this; }
 		__forceinline const T&	operator[]	(const S& index) const { assert(check(index)); return _mem[index]; }
 		__forceinline T&		operator[]	(const S& index) { assert(check(index)); return _mem[index]; }
@@ -117,7 +118,8 @@ namespace pFROST {
 			pfshrinkAlloc(_mem, sizeof(T) * sz);
 			cap = sz;
 		}
-		__forceinline void		copyFrom	(const Vec<T, S>& copy) {
+		template<class Container = Vec<T, S>>
+		__forceinline void		copyFrom	(const Container& copy) {
 			resize(copy.size());
 			std::memcpy(_mem, copy.data(), sz * sizeof(T));
 		}

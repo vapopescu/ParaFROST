@@ -150,11 +150,12 @@ void ParaFROST::IGR()
 						working++;
 					}
 					if (terminate) break;
-					np = queue.front(); queue.pop_front();
+					np = std::move(queue.front());
+					queue.pop_front();
 				}
 
 				uint32& lit = np.first;
-				Path<uint32>& path = np.second;
+				uVec1D& path = np.second;
 
 				do { // visit()
 					ig[lit].lockRead();
@@ -166,7 +167,15 @@ void ParaFROST::IGR()
 					}
 
 					// Equivalence reduction.
-					if (path.itemSet().count(lit)) {
+					bool cycle = false;
+					for (int i = 0; i < path.size(); i++) {
+						if (path[i] == lit) {
+							cycle = true;
+							break;
+						}
+					}
+
+					if (cycle) {
 						ig[lit].unlockRead();
 						uint32 targetLit = lit;
 						mCycle.lock();
@@ -180,7 +189,7 @@ void ParaFROST::IGR()
 						} while (lit != targetLit);
 
 						mCycle.unlock();
-						np = NodePath(0, {});
+						lit = 0;
 						break; // "return"
 					}
 
@@ -219,7 +228,7 @@ void ParaFROST::IGR()
 						ig[lit].lock();
 						ig[lit].markVisited();
 						ig[lit].unlock();
-						np = NodePath(0, {});
+						np.first = 0;
 						break; // "return"
 					}
 
@@ -256,12 +265,11 @@ void ParaFROST::IGR()
 					ig[lit].unlock();
 				} while (false); // point to "return" to.
 
-				if (path.size() > 0) {
-					uint32 prev = path.back(); path.pop();
-					np = NodePath(prev, path);
+				if (lit != 0 && path.size() > 0) {
+					lit = path.back(); path.pop();
 				}
 				else {
-					np = NodePath(0, {});
+					lit = 0;
 				}
 			}
 		});
