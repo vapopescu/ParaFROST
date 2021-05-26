@@ -160,6 +160,14 @@ void ParaFROST::IGR()
 				do { // visit()
 					ig[lit].lockRead();
 
+					// If the node got reduced, check the reference.
+					while (ig[lit].isReduced()) {
+						uint32 newLit = ig[lit].descendants()[0];
+						ig[lit].unlockRead();
+						lit = newLit;
+						ig[lit].lockRead();
+					}
+
 					// Early return. Nothing left to do.
 					if (ig[lit].isExplored()) {
 						ig[lit].unlockRead();
@@ -195,6 +203,7 @@ void ParaFROST::IGR()
 
 					// Explore children first.
 					Vec<Edge> cs = ig[lit].children();
+					ig[lit].unlockRead();
 					uVec1D children;
 					bool childrenExplored = true;
 					path.push(lit);
@@ -215,13 +224,12 @@ void ParaFROST::IGR()
 								}
 							}
 							else if (childrenExplored) {
-								children.unionize(uVec1D(1, c));
+								children.push(c);
 							}
 							ig[c].unlockRead();
 						}
 					}
 					path.pop();
-					ig[lit].unlockRead();
 
 					// Cannot procede if not all children are explored.
 					if (!childrenExplored) {

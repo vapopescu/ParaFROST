@@ -969,20 +969,19 @@ namespace SIGmA {
 
 	inline void clause_replace(const S_REF& c, const uint32& oldLit, const uint32& newLit, IG& ig)
 	{
-		bool duplicated = false;
-
 		// Replace literals avoiding duplication.
+		uint32 n = 0;
+		uint64 sig = 0;
 		for (int k = 0; k < c->size(); k++) {
-			if (c->lit(k) == oldLit) {
-				(*c)[k] = newLit;
-			}
-			else if (c->lit(k) == newLit) {
-				(*c)[k] = inf.nDualVars;
-				duplicated = true;
+			if (c->lit(k) != oldLit && c->lit(k) != newLit) {
+				(*c)[n++] = (*c)[k];
+				sig |= MAPHASH((*c)[k]);
 			}
 		}
+		(*c)[n++] = newLit;
+		c->resize(n);
+		c->set_sig(sig);
 		std::sort(c->data(), c->data() + c->size());
-		if (duplicated) c->shrink(1);
 
 		// Tautology check.
 		for (int k = 1; k < c->size(); k++) {
@@ -998,24 +997,16 @@ namespace SIGmA {
 			if (c->lit(1) == oldLit) otherLit = c->lit(0);
 			else otherLit = c->lit(1);
 
-			if (!duplicated) {
-				ig[oldLit].lock(); ig[oldLit].deleteParent(FLIP(otherLit)); ig[oldLit].unlock();
-				ig[otherLit].lock(); ig[otherLit].deleteParent(FLIP(oldLit)); ig[otherLit].unlock();
-				ig[FLIP(oldLit)].lock(); ig[FLIP(oldLit)].deleteChild(otherLit); ig[FLIP(oldLit)].unlock();
-				ig[FLIP(otherLit)].lock(); ig[FLIP(otherLit)].deleteChild(oldLit); ig[FLIP(otherLit)].unlock();
-			}
-			else {
-				// TODO inform search about new binary clause.
-			}
+			ig[oldLit].lock(); ig[oldLit].deleteParent(FLIP(otherLit)); ig[oldLit].unlock();
+			ig[otherLit].lock(); ig[otherLit].deleteParent(FLIP(oldLit)); ig[otherLit].unlock();
+			ig[FLIP(oldLit)].lock(); ig[FLIP(oldLit)].deleteChild(otherLit); ig[FLIP(oldLit)].unlock();
+			ig[FLIP(otherLit)].lock(); ig[FLIP(otherLit)].deleteChild(oldLit); ig[FLIP(otherLit)].unlock();
 
 			ig[newLit].lock(); ig[newLit].appendParent(FLIP(otherLit), c); ig[newLit].sortEdges(); ig[newLit].unlock();
 			ig[otherLit].lock(); ig[otherLit].appendParent(FLIP(newLit), c); ig[otherLit].sortEdges(); ig[otherLit].unlock();
 			ig[FLIP(newLit)].lock(); ig[FLIP(newLit)].appendChild(otherLit, c); ig[FLIP(newLit)].sortEdges(); ig[FLIP(newLit)].unlock();
 			ig[FLIP(otherLit)].lock(); ig[FLIP(otherLit)].appendChild(newLit, c); ig[FLIP(otherLit)].sortEdges(); ig[FLIP(otherLit)].unlock();
 		}
-
-		// Update signature.
-		c->calcSig();
 	}
 
 	inline void node_reduce(const uint32& oldLit, const uint32& newLit, OT& ot, IG& ig)

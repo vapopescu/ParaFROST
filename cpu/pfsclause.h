@@ -66,7 +66,7 @@ namespace pFROST {
 				_lits[k] = src[k];
 			}
 		}
-		inline void		set_sig		(const uint32& sig) { _sig = sig; }
+		inline void		set_sig		(const uint64& sig) { _sig = sig; }
 		inline void		set_lbd		(const int& lbd) { _lbd = lbd; }
 		inline void		set_status	(const CL_ST& status) { _st = status; }
 		inline void		set_usage	(const CL_ST& usage) { assert(usage <= USAGE_MAX); _f = (_f & USAGE_RES) | (usage << USAGE_OFF); }
@@ -96,7 +96,7 @@ namespace pFROST {
 		inline CL_ST	status		() const { return _st; }
 		inline int		lbd			() const { return _lbd; }
 		inline int		size		() const { return _sz; }
-		inline uint32	sig			() { return _sig; }
+		inline uint64	sig			() { return _sig; }
 		inline int		hasZero		() {
 			for (int l = 0; l < size(); l++) {
 				if (_lits[l] == 0) return l;
@@ -109,7 +109,7 @@ namespace pFROST {
 			}
 			return true;
 		}
-		inline void		calcSig		(const uint32& init_sig = 0) {
+		inline void		calcSig		(const uint64& init_sig = 0) {
 			_sig = init_sig;
 			for (int l = 0; l < this->size(); l++)
 				_sig |= MAPHASH(_lits[l]);

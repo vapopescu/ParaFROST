@@ -55,7 +55,6 @@ namespace pFROST {
 			for (uint32 i = 0; i < vec.size(); i++) {
 				if (vec[i].first != lit) vec[n++] = vec[i];
 			}
-			assert(n + 1 == vec.size());
 			vec.resize(n);
 		}
 		inline bool		empty			(const Vec<Edge>& vec) const
