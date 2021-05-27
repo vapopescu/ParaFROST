@@ -181,7 +181,7 @@ void OPTION::init() {
 		aggr_cnf_sort = opt_aggr_cnf_sort;
 		profile_simp = opt_profile_simp_en;
 		ve_plus_en = opt_ve_plus_en;
-		hla_en = opt_hla_en;
+		hla_en = opt_hla_en && opt_igr_en;
 		bce_en = opt_bce_en;
 		ere_en = opt_ere_en;
 		all_en = opt_all_en;
@@ -195,7 +195,7 @@ void OPTION::init() {
 		bce_limit = opt_bce_max_occurs;
 		ere_limit = opt_ere_max_occurs;
 		xor_max_arity = opt_xor_max_arity;
-		igr_en = opt_igr_en || hla_en;
+		igr_en = opt_igr_en;
 		ce_en = opt_ce_en;
 		ve_en = opt_ve_en || ve_plus_en;
 		hse_en = opt_hse_en || ve_plus_en;

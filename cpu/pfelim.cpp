@@ -206,7 +206,6 @@ void ParaFROST::IGR()
 					ig[lit].unlockRead();
 					uVec1D children;
 					bool childrenExplored = true;
-					path.push(lit);
 					for (uint32 i = 0; i < cs.size(); i++) {
 						if (!cs[i].second->deleted()) {
 							uint32 c = cs[i].first;
@@ -214,8 +213,13 @@ void ParaFROST::IGR()
 							if (!ig[c].isExplored()) {
 								childrenExplored = false;
 								if (!ig[lit].isVisited()) {
-									std::unique_lock<std::mutex> lock(mQueue);
-									queue.push_front(NodePath(c, path));
+									NodePath cnp = NodePath(c, uVec1D());
+									cnp.second.reserve(path.size() + 1);
+									cnp.second.copyFrom(path);
+									cnp.second.push(lit);
+
+									std::unique_lock lock(mQueue);
+									queue.push_front(std::move(cnp));
 									cv1.notify_one();
 								}
 								else {
@@ -229,7 +233,6 @@ void ParaFROST::IGR()
 							ig[c].unlockRead();
 						}
 					}
-					path.pop();
 
 					// Cannot procede if not all children are explored.
 					if (!childrenExplored) {

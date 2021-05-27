@@ -72,6 +72,9 @@ namespace pFROST {
 		__forceinline void		lock		() { _m.lock(); }
 		__forceinline void		unlock		() { _m.unlock(); }
 		__forceinline void		init		() { maxCap = std::numeric_limits<S>::max(), _mem = NULL, sz = 0, cap = 0; }
+		__forceinline			Vec			(Vec<T, S>&& orig) { 
+			maxCap = std::numeric_limits<S>::max(), _mem = orig._mem, sz = orig.sz, cap = orig.cap; orig.init();
+		}
 		__forceinline void		init		(const S& off, const S& n, const T& val) {
 			if (!val && !off) { std::memset(_mem, 0, n * sizeof(T)); }
 			else { for (S i = off; i < n; i++) _mem[i] = val; }
