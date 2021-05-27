@@ -322,7 +322,7 @@ void ParaFROST::CE()
 		if (opts.profile_simp) timer.pstart();
 
 		workerPool.doWorkForEach((size_t)0, scnf.size(), (size_t)64, [this](size_t i) {
-			clause_elim(scnf[i], ot);
+			clause_elim(scnf[i], ot, ig);
 		});
 
 		workerPool.join();

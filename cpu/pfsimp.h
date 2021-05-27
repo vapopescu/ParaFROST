@@ -916,26 +916,55 @@ namespace SIGmA {
 		}
 	}
 
-	inline void clause_elim(S_REF& c, OT& ot)
+	inline void flip_lits(uVec1D& lits) {
+		for (uint32 i = 0; i < lits.size(); i++) {
+			lits[i] = FLIP(lits[i]);
+		}
+	}
+
+	inline void clause_elim(S_REF& c, OT& ot, IG& ig)
 	{
 		if (c->size() <= 2) return;
 
 		// FSE
 		if (pfrost->opts.hse_en && !c->deleted() && c->size() <= HSE_MAX_CL_SIZE) {
 			CNF_CMP_ABS less;
-			OL subsumed = OL(ot[c->lit(0)]);
+			OL subsumed;
 
-			for (int k = 1; k < c->size() && !subsumed.empty(); k++) {
-				OL& ol = ot[c->lit(k)];
-				uint32 n = 0;
-				for (uint32 i = 0, j = i; i < subsumed.size() && j < ol.size(); ) {
-					S_REF& c = subsumed[i], & d = ol[j];
-					if (c->deleted() || less(c, d)) i++;
-					else if (d->deleted() || less(d, c)) j++;
-					else if (subsumed[i] != c) { subsumed[n++] = subsumed[i++]; j++; }
-					else { i++; j++; }
+			for (int k = 0; k < c->size() && !subsumed.empty(); k++) {
+				uint32 lit = c->lit(k);
+				OL& ol = ot[lit];
+				OL *candidates = nullptr;
+
+				if (pfrost->opts.hla_en) {
+					candidates = new OL(ol);
+					for (uint32 i = 0; i < ig[lit].descendants().size(); i++) {
+						uint32 aug = ig[lit].descendants()[i];
+						candidates->unionize(ot[aug]);
+					}
 				}
-				subsumed.resize(n);
+				else {
+					candidates = &ol;
+				}
+
+				if (k == 0) {
+					subsumed.copyFrom(*candidates);
+				}
+				else {
+					uint32 n = 0;
+					for (uint32 i = 0, j = 0; i < subsumed.size() && j < candidates->size(); ) {
+						S_REF& c = subsumed[i], & d = (*candidates)[j];
+						if (c->deleted() || less(c, d)) i++;
+						else if (d->deleted() || less(d, c)) j++;
+						else if (subsumed[i] != c) { subsumed[n++] = subsumed[i++]; j++; }
+						else { i++; j++; }
+					}
+					subsumed.resize(n);
+				}
+
+				if (pfrost->opts.hla_en) {
+					delete candidates;
+				}
 			}
 
 			bool promote = false;
