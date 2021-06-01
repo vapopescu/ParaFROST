@@ -5,6 +5,7 @@
 
 # Author specified files and directories
 benchmarks/
+lib/
 
 # User-specific files
 *.rsuser
