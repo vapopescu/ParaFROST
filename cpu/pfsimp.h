@@ -931,7 +931,7 @@ namespace SIGmA {
 			CNF_CMP_ABS less;
 			OL subsumed;
 
-			for (int k = 0; k < c->size() && !subsumed.empty(); k++) {
+			for (int k = 0; k < c->size(); k++) {
 				uint32 lit = c->lit(k);
 				OL& ol = ot[lit];
 				OL *candidates = nullptr;
@@ -951,12 +951,12 @@ namespace SIGmA {
 					subsumed.copyFrom(*candidates);
 				}
 				else {
-					uint32 n = 0;
-					for (uint32 i = 0, j = 0; i < subsumed.size() && j < candidates->size(); ) {
-						S_REF& c = subsumed[i], & d = (*candidates)[j];
-						if (c->deleted() || less(c, d)) i++;
-						else if (d->deleted() || less(d, c)) j++;
-						else if (subsumed[i] != c) { subsumed[n++] = subsumed[i++]; j++; }
+					uint32 i = 0, j = 0, n = 0;
+					while (i < subsumed.size() && j < candidates->size()) {
+						S_REF& d1 = subsumed[i], & d2 = (*candidates)[j];
+						if (d1->deleted() || less(d1, d2)) i++;
+						else if (d2->deleted() || less(d2, d1)) j++;
+						else if (d1 != c) { subsumed[n++] = subsumed[i++]; j++; }
 						else { i++; j++; }
 					}
 					subsumed.resize(n);
@@ -965,6 +965,8 @@ namespace SIGmA {
 				if (pfrost->opts.hla_en) {
 					delete candidates;
 				}
+
+				if (subsumed.empty()) break;
 			}
 
 			bool promote = false;
