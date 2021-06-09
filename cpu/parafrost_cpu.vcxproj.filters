@@ -114,6 +114,9 @@
     <ClInclude Include="pfpath.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="scc_wrapper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pfanalyze.cpp">

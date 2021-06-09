@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 **********************************************************************************/
 
 #pragma once
+
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -37,10 +38,6 @@ namespace pFROST {
 		unsigned int						_waiting;
 
 	public:
-		WorkerPool		()							{ init(std::thread::hardware_concurrency()); }
-		WorkerPool		(unsigned int threads)		{ init(threads); }
-		~WorkerPool		()							{ destroy(); }
-
 		inline void init(unsigned int threads)
 		{
 			_workers.clear();

@@ -40,6 +40,7 @@ ParaFROST::ParaFROST(const string& _path) :
 	, sigState(AWAKEN_SUCC)
 {
 	opts.init();
+	workerPool.init(opts.worker_count);
 	stats.sysMemAvail = getAvailSysMem();
 	getCPUInfo();
 	PFLOG2(1, " Available system memory = %lld GB", stats.sysMemAvail / GBYTE);

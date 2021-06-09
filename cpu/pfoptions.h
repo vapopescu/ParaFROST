@@ -58,6 +58,7 @@ namespace pFROST {
 		int		minimizebin_max, minimize_depth;
 		int		mdm_rounds,	mdm_freq, mdm_div, mdm_minc, mdm_sinc, mdm_vsids_pumps, mdm_vmfq_pumps;
 		int		subsume_inc, subsume_min_occs, subsume_min_checks, subsume_max_checks, subsume_max_csize;
+		int		worker_count;
 		//------------------------------------------//
 		bool	model_en;
 		bool	proof_en;

@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 **********************************************************************************/
 
 #include "pfoptions.h"
+#include <thread>
 
 using namespace pFROST;
 
@@ -101,6 +102,7 @@ INT_OPT opt_bumpreason_depth("bumpreasondepth", "bumping depth to explore", 1, I
 INT_OPT opt_rephase_inc("rephaseinc", "rephasing increment value based on conflicts", 1000, INT32R(100, INT32_MAX));
 INT_OPT opt_powrestart_inc("powerrestartinc", "power restart increment value based on conflicts", 2, INT32R(0, INT32_MAX));
 INT_OPT opt_stabrestart_inc("stablerestartinc", "stable restart increment value based on conflicts", 1000, INT32R(1, INT32_MAX));
+INT_OPT opt_worker_count("workers", "number of worker threads for parallel algorithms", (int)std::thread::hardware_concurrency(), INT32R(1, INT32_MAX));
 DOUBLE_OPT opt_stabrestart_rate("stablerestartrate", "stable restart increase rate", 2.0, FP64R(1, 5));
 DOUBLE_OPT opt_lbd_rate("lbdrate", "slow rate in firing lbd restarts", 1.1, FP64R(1, 10));
 DOUBLE_OPT opt_map_perc("mapperc", "minimum percentage of variables to map", 0.1, FP64R(0, 1));
@@ -175,6 +177,7 @@ void OPTION::init() {
 	learntsub_max = opt_learntsub_max;
 	target_phase_en = opt_targetphase_en;
 	gc_perc = opt_garbage_perc;
+	worker_count = opt_worker_count;
 	// initialize simplifier options
 	if (sigma_en || sigma_live_en) {
 		solve_en = opt_solve_en;

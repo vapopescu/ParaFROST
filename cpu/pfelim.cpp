@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 **********************************************************************************/
 
 #include "pfsimp.h"
+#include "scc_wrapper.h"
 
 using namespace pFROST;
 using namespace SIGmA;
@@ -104,7 +105,7 @@ void ParaFROST::IGR()
 {
 	if (phase == 0 && opts.igr_en) {
 		if (interrupted()) killSolver();
-		PFLOGN2(2, "  Reasoning on the implication graph..");
+		PFLOGN2(2, " Reasoning on the implication graph..");
 		if (opts.profile_simp) timer.pstart();
 
 		workerPool.doWorkForEach((uint32)0, inf.nDualVars, [this](uint32 i) {
@@ -132,8 +133,38 @@ void ParaFROST::IGR()
 			ig[lit].sortEdges();
 			if (ig[lit].isOrphan()) { std::unique_lock lock(mQueue); queue.push_back(NodePath(lit, {})); }
 		});
-
 		workerPool.join();
+
+		SCCWrapper wrapper;
+		wrapper.setNumThreads(opts.worker_count);
+		wrapper.setMethod(SCC_UFSCC);
+		wrapper.setGraph(ig);
+
+		node_t *scc = wrapper.getSCC();
+		std::atomic<uint32> sccCount = 0;
+
+		workerPool.doWorkForEach((uint32)1, inf.maxVar, [&](uint32 v) {
+			const uint32 lit = V2L(v);
+			const uint32& repLit = scc[lit];
+			scc[FLIP(lit)] = FLIP(repLit);
+		});
+		workerPool.join();
+
+		workerPool.doWorkForEach((uint32)1, inf.maxVar, [&](uint32 v) {
+			const uint32 lit = V2L(v);
+			const uint32& repLit = scc[lit];
+
+			if (lit == repLit) sccCount++;
+			else {
+				node_reduce(lit, repLit, ot, ig);
+				node_reduce(FLIP(lit), FLIP(repLit), ot, ig);
+				sp->vstate[v] = MELTED, v = 0;
+			}
+		});
+		workerPool.join();
+
+		delete[] scc;
+
 		int working = workerPool.count();
 		bool terminate = false;
 
@@ -178,27 +209,8 @@ void ParaFROST::IGR()
 					bool cycle = false;
 					for (int i = 0; i < path.size(); i++) {
 						if (path[i] == lit) {
-							cycle = true;
-							break;
+							PFLOGE("Cycle detected after equivalence reduction.");
 						}
-					}
-
-					if (cycle) {
-						ig[lit].unlockRead();
-						uint32 targetLit = lit;
-						mCycle.lock();
-
-						do {
-							if (lit != targetLit) {
-								node_reduce(lit, targetLit, ot, ig);
-								node_reduce(FLIP(lit), FLIP(targetLit), ot, ig);
-							}
-							lit = path.back(); path.pop();
-						} while (lit != targetLit);
-
-						mCycle.unlock();
-						lit = 0;
-						break; // "return"
 					}
 
 					// Explore children first.
@@ -251,7 +263,7 @@ void ParaFROST::IGR()
 							bool redundant = false;
 
 							// Remove redundant edges.
-							for (uint32 j = 0; j < ig[lit].descendants().size(); j++) {
+							/*for (uint32 j = 0; j < ig[lit].descendants().size(); j++) {
 								if (ig[lit].descendants()[j] < c) continue;
 								else if (ig[lit].descendants()[j] == c) {
 									cs[i].second->markDeleted();
@@ -264,7 +276,7 @@ void ParaFROST::IGR()
 							if (redundant) {
 								ig[c].unlockRead();
 								continue;
-							}
+							}*/
 
 							ig[lit].descendants().unionize(ig[c].descendants());
 							ig[c].unlockRead();
@@ -311,6 +323,8 @@ void ParaFROST::IGR()
 
 		if (opts.profile_simp) timer.pstop(), timer.hse += timer.pcpuTime();
 		PFLDONE(2, 5);
+		//PFLOG2(2, " Number of SCCs in IG is %d.", (uint32)sccCount);
+		PFLREDALL(this, 2, "IGR Reductions");
 	}
 }
 

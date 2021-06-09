@@ -76,9 +76,9 @@ namespace pFROST {
 		string			solLine;
 		std::ofstream	proofFile;
 		bool			intr;
-		WorkerPool		workerPool;
 	public:
 		OPTION			opts;
+		WorkerPool		workerPool;
 		//============== inline methods ===============
 		inline void		strengthen			(CLAUSE&, const uint32&);
 		inline int		removeRooted		(CLAUSE&);
@@ -116,7 +116,7 @@ namespace pFROST {
 		inline bool		verifyMDM			();
 		inline bool		verifySeen			();
 		//==============================================
-		inline			~ParaFROST			() { }
+		inline			~ParaFROST			() { workerPool.destroy(); }
 		inline void		interrupt			() { intr = true; }
 		inline void		incDL				() { dlevels.push(trail.size()); }
 		inline void		decayVarAct			() { lrn.var_inc *= (1.0 / lrn.var_decay); }

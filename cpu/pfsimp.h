@@ -22,6 +22,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfsort.h"
 #include "pfsolve.h"
 #include "pfrange.h"
+#include "scc_wrapper.h"
+
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
@@ -948,7 +950,15 @@ namespace SIGmA {
 				}
 
 				if (k == 0) {
-					subsumed.copyFrom(*candidates);
+					subsumed.copyFrom(*candidates); 
+					if (!pfrost->opts.hla_en) {
+						uint32 i = 0, n = 0;
+						while (i < subsumed.size()) {
+							S_REF& d = subsumed[i];
+							if (subset_sig(c->sig(), d->sig())) subsumed[n++] = subsumed[i];
+							i++;
+						}
+					}
 				}
 				else {
 					uint32 i = 0, j = 0, n = 0;
@@ -1003,24 +1013,31 @@ namespace SIGmA {
 		// Replace literals avoiding duplication.
 		uint32 n = 0;
 		uint64 sig = 0;
+		uint32 prevSize = c->size();
+		bool duplicate = false;
+
 		for (int k = 0; k < c->size(); k++) {
-			if (c->lit(k) != oldLit && c->lit(k) != newLit) {
+			if (c->lit(k) == FLIP(newLit)) {
+				c->markDeleted();
+				return;
+			}
+			else if (c->lit(k) == oldLit) {
+				continue;
+			}
+			else {
+				if (c->lit(k) == newLit) duplicate = true;
 				(*c)[n++] = (*c)[k];
 				sig |= MAPHASH((*c)[k]);
 			}
 		}
-		(*c)[n++] = newLit;
+
+		if (!duplicate) {
+			(*c)[n++] = newLit;
+			std::sort(c->data(), c->data() + n);
+			sig |= MAPHASH(newLit);
+		}
 		c->resize(n);
 		c->set_sig(sig);
-		std::sort(c->data(), c->data() + c->size());
-
-		// Tautology check.
-		for (int k = 1; k < c->size(); k++) {
-			if (c->lit(k) == FLIP(c->lit(k - 1))) {
-				c->markDeleted();
-				return;
-			}
-		}
 
 		// Update IG 
 		if (c->size() == 2) {
@@ -1028,10 +1045,15 @@ namespace SIGmA {
 			if (c->lit(1) == oldLit) otherLit = c->lit(0);
 			else otherLit = c->lit(1);
 
-			ig[oldLit].lock(); ig[oldLit].deleteParent(FLIP(otherLit)); ig[oldLit].unlock();
-			ig[otherLit].lock(); ig[otherLit].deleteParent(FLIP(oldLit)); ig[otherLit].unlock();
-			ig[FLIP(oldLit)].lock(); ig[FLIP(oldLit)].deleteChild(otherLit); ig[FLIP(oldLit)].unlock();
-			ig[FLIP(otherLit)].lock(); ig[FLIP(otherLit)].deleteChild(oldLit); ig[FLIP(otherLit)].unlock();
+			if (prevSize == 2) {
+				ig[oldLit].lock(); ig[oldLit].deleteParent(FLIP(otherLit)); ig[oldLit].unlock();
+				ig[otherLit].lock(); ig[otherLit].deleteParent(FLIP(oldLit)); ig[otherLit].unlock();
+				ig[FLIP(oldLit)].lock(); ig[FLIP(oldLit)].deleteChild(otherLit); ig[FLIP(oldLit)].unlock();
+				ig[FLIP(otherLit)].lock(); ig[FLIP(otherLit)].deleteChild(oldLit); ig[FLIP(otherLit)].unlock();
+			}
+			else {
+				// TODO: notify search about new edge.
+			}
 
 			ig[newLit].lock(); ig[newLit].appendParent(FLIP(otherLit), c); ig[newLit].sortEdges(); ig[newLit].unlock();
 			ig[otherLit].lock(); ig[otherLit].appendParent(FLIP(newLit), c); ig[otherLit].sortEdges(); ig[otherLit].unlock();
