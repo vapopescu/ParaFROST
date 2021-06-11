@@ -5,7 +5,7 @@
 
 # Author specified files and directories
 benchmarks/
-lib/
+[cg]pu/*.o
 
 # User-specific files
 *.rsuser
