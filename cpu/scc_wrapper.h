@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "pfsolve.h"
 #include "scc.h"
 #include "my_work_queue.h"
 #include "common_main.h"
@@ -27,6 +28,7 @@ extern node_t* G_SCC;
 extern int32_t G_num_nodes;
 
 namespace pFROST {
+
 	enum scc_method {
 		SCC_TARJAN,
 		SCC_UFSCC
@@ -61,13 +63,22 @@ namespace pFROST {
 				G.add_node();
 			}
 
-			for (uint32 i = 0; i < inf.nDualVars; i++) {
+			pfrost->workerPool.doWorkForEach((uint32)0, inf.nDualVars, [&](uint32 i) {
 				for (uint32 j = 0; j < ig[i].children().size(); j++) {
 					if (!ig[i].children()[j].second->deleted()) {
 						G.add_edge(i, ig[i].children()[j].first);
 					}
 				}
-			}
+			});
+			pfrost->workerPool.join();
+
+			/*for (uint32 i = 0; i < inf.nDualVars; i++) {
+				for (uint32 j = 0; j < ig[i].children().size(); j++) {
+					if (!ig[i].children()[j].second->deleted()) {
+						G.add_edge(i, ig[i].children()[j].first);
+					}
+				}
+			}*/
 		}
 
 		inline node_t* getSCC() {
