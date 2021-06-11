@@ -13,6 +13,9 @@ ifeq (,$(filter $(TARGET_OS),linux))
     $(error ERROR - unsupported value $(TARGET_OS) for TARGET_OS!)
 endif
 
+# current directory
+PWD := $(shell pwd)
+
 # target arch
 TARGET_ARCH := $(shell uname -m)
 
@@ -23,7 +26,7 @@ HOST_COMPILER ?= g++
 TARGET_SIZE := $(shell getconf LONG_BIT)
 
 # compiler flags
-MTHREADS  := -pthread
+MTHREADS  := 
 CCFLAGS   := -m${TARGET_SIZE} -std=c++17 -Wno-format-zero-length
 LDFLAGS   := 
 
@@ -43,7 +46,7 @@ else
 endif
 
 # Common includes 
-INCLUDES  := 
+INCLUDES  := -I$(PWD)/../lib/hong-ufscc/gm_graph/inc/ -I$(PWD)/../lib/hong-ufscc/src/
 LIBRARIES :=
 
 # Target rules
@@ -65,10 +68,10 @@ parafrost: pfmain.o libpfrost.a
 	cp $@ build/$(BUILD_TYPE)/
 
 pfmain.o:pfmain.cpp
-	$(HOST_COMPILER) -I$(INCLUDES) -L$(LIBRARIES) $(CCFLAGS) -o $@ -c $(WARN) $<
+	$(HOST_COMPILER) $(INCLUDES) $(LIBRARIES) $(CCFLAGS) -o $@ -c $(WARN) $<
 
 %.o:%.cpp
-	$(HOST_COMPILER) -I$(INCLUDES) -L$(LIBRARIES) $(CCFLAGS) -o $@ -c $(WARN) $<
+	$(HOST_COMPILER) $(INCLUDES) $(LIBRARIES) $(CCFLAGS) -o $@ -c $(WARN) $<
 
 clean:
 	rm -f *.o libpfrost.a parafrost  
