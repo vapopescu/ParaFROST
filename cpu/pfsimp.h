@@ -48,8 +48,6 @@ namespace SIGmA {
 #define COUNTFLIPS(X) while (__popcnt(++X) & 1); 
 #endif
 
-	typedef std::pair<uint32, uVec1D> NodePath;
-
 	// OT sorting comparator
 	struct CNF_CMP_ABS {
 		bool operator () (S_REF x, S_REF y) {
