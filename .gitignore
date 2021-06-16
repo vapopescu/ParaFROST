@@ -6,6 +6,8 @@
 # Author specified files and directories
 benchmarks/
 [cg]pu/*.o
+[cg]pu/parafrost
+[cg]pu/libpfrost.a
 
 # User-specific files
 *.rsuser

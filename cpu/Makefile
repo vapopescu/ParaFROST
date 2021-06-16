@@ -26,8 +26,7 @@ HOST_COMPILER ?= g++
 TARGET_SIZE := $(shell getconf LONG_BIT)
 
 # compiler flags
-MTHREADS  := 
-CCFLAGS   := -m${TARGET_SIZE} -std=c++17 -Wno-format-zero-length
+CCFLAGS   := -m${TARGET_SIZE} -std=c++17 -pthread -fopenmp -Wno-format-zero-length
 LDFLAGS   := 
 
 # Debug build flags
@@ -47,7 +46,9 @@ endif
 
 # Common includes 
 INCLUDES  := -I$(PWD)/../lib/hong-ufscc/gm_graph/inc/ -I$(PWD)/../lib/hong-ufscc/src/
-LIBRARIES :=
+LIBRARIES := -L. -lpfrost
+LIBRARIES += -L../lib/hong-ufscc -lhongufscc
+LIBRARIES += -L../lib/hong-ufscc/gm_graph/lib -lgmgraph
 
 # Target rules
 
@@ -58,20 +59,23 @@ obj := $(patsubst %.cpp,%.o,$(src))
 
 all: parafrost
 
+libhongufscc.a:
+	@cd ../lib/hong-ufscc; make 
+
 libpfrost.a: $(obj)
 	ar rc $@ $+
 	ranlib $@
 
-parafrost: pfmain.o libpfrost.a
-	$(HOST_COMPILER) $(CCFLAGS) -o $@ pfmain.o -L. -lpfrost $(LIBRARIES)
+parafrost: pfmain.o libpfrost.a libhongufscc.a
+	$(HOST_COMPILER) $(CCFLAGS) $(LDFLAGS) -o $@ pfmain.o $(LIBRARIES)
 	mkdir -p build/$(BUILD_TYPE)
 	cp $@ build/$(BUILD_TYPE)/
 
 pfmain.o:pfmain.cpp
-	$(HOST_COMPILER) $(INCLUDES) $(LIBRARIES) $(CCFLAGS) -o $@ -c $(WARN) $<
+	$(HOST_COMPILER) $(INCLUDES) $(CCFLAGS) $(LDFLAGS) -o $@ -c $(WARN) $<
 
 %.o:%.cpp
-	$(HOST_COMPILER) $(INCLUDES) $(LIBRARIES) $(CCFLAGS) -o $@ -c $(WARN) $<
+	$(HOST_COMPILER) $(INCLUDES) $(LIBRARIES) $(CCFLAGS) $(LDFLAGS) -o $@ -c $(WARN) $<
 
 clean:
 	rm -f *.o libpfrost.a parafrost  
