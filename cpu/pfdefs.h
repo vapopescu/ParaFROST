@@ -33,6 +33,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <cstdlib>
 #include <csignal>
 #include <random>
+#include <chrono>
 #include <atomic>
 #include "pflogging.h"
 #include "pfdtypes.h"
@@ -75,19 +76,19 @@ namespace pFROST {
 
 	class TIMER {
 	private:
-		clock_t _start, _stop;
-		clock_t _start_p, _stop_p;
+		std::chrono::high_resolution_clock::time_point _start, _stop;
+		std::chrono::high_resolution_clock::time_point _start_p, _stop_p;
 		float _cpuTime;
 	public:
 		float parse, solve, simp;
 		float vo, ve, hse, bce, ere, cot, rot, sot, gc, io;
 		TIMER			() { memset(this, 0, sizeof(*this)); }
-		void start		() { _start = clock(); }
-		void stop		() { _stop = clock(); }
-		float cpuTime	() { return _cpuTime = ((float)abs(_stop - _start)) / CLOCKS_PER_SEC; }
-		void pstart		() { _start_p = clock(); }
-		void pstop		() { _stop_p = clock(); }
-		float pcpuTime	() { return _cpuTime = (((float)abs(_stop_p - _start_p)) / CLOCKS_PER_SEC) * float(1000.0); }
+		void start		() { _start = std::chrono::high_resolution_clock::now(); }
+		void stop		() { _stop = std::chrono::high_resolution_clock::now(); }
+		float cpuTime	() { return _cpuTime = ((float)std::chrono::duration_cast<std::chrono::milliseconds>(_stop - _start).count()) / 1000; }
+		void pstart		() { _start_p = std::chrono::high_resolution_clock::now(); }
+		void pstop		() { _stop_p = std::chrono::high_resolution_clock::now(); }
+		float pcpuTime	() { return _cpuTime = ((float)std::chrono::duration_cast<std::chrono::milliseconds>(_stop_p - _start_p).count()) / 1000; }
 	};
 	//====================================================//
 	//                 iterators & checkers               //

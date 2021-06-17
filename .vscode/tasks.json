@@ -11,10 +11,7 @@
                 "cwd": "${workspaceFolder}/cpu"
             },
             "problemMatcher": [],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
+            "group": "build",
         },
         {
             "label": "make release",
@@ -24,7 +21,10 @@
                 "cwd": "${workspaceFolder}/cpu"
             },
             "problemMatcher": [],
-            "group": "build",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ]
 }
