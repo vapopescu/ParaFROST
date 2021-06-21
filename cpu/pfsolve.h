@@ -629,7 +629,7 @@ namespace pFROST {
 		void	HSE					();
 		void	ERE					();
 		void	BCE					();
-		void	sortOT				();
+		void	sortOT				(bool);
 		void	reduceOT			();
 		void	reduceOL			(OL&);
 		void	extract				(const BCNF&);

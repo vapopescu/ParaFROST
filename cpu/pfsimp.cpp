@@ -76,11 +76,11 @@ void ParaFROST::reduceOT()
 	if (opts.profile_simp) timer.pstop(), timer.rot += timer.pcpuTime();
 }
 
-void ParaFROST::sortOT()
+void ParaFROST::sortOT(bool partial)
 {
 	if (opts.profile_simp) timer.pstart();
 
-	if (opts.ce_en) {
+	if (!partial && opts.ce_en) {
 		workerPool.doWorkForEach((uint32)1, inf.maxVar, [this](uint32 v) {
 			assert(v);
 			uint32 p = V2L(v), n = NEG(p);
@@ -88,8 +88,9 @@ void ParaFROST::sortOT()
 			std::sort(poss.data(), poss.data() + poss.size(), CNF_CMP_ABS());
 			std::sort(negs.data(), negs.data() + negs.size(), CNF_CMP_ABS());
 		});
+		workerPool.join();
 	}
-	else {
+	else if (partial && !opts.ce_en) {
 		workerPool.doWorkForEach((uint32)0, PVs.size(), [this](uint32 i) {
 			uint32& v = PVs[i];
 			assert(v);
@@ -98,9 +99,9 @@ void ParaFROST::sortOT()
 			std::sort(poss.data(), poss.data() + poss.size(), CNF_CMP_KEY());
 			std::sort(negs.data(), negs.data() + negs.size(), CNF_CMP_KEY());
 		});
+		workerPool.join();
 	}
 
-	workerPool.join();
 	if (opts.profile_simp) timer.pstop(), timer.sot += timer.pcpuTime();
 }
 
@@ -179,11 +180,12 @@ void ParaFROST::sigmify()
 			IGR();
 
 			// Stage 3
-			sortOT();
+			sortOT(true);
 			CE();
 
 			// Stage 4
 			if (!LCVE()) break;
+			sortOT(false);
 			if (stop(diff)) { ERE(); break; }
 			HSE(), VE(), BCE();
 
