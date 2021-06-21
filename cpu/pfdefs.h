@@ -78,17 +78,23 @@ namespace pFROST {
 	private:
 		std::chrono::high_resolution_clock::time_point _start, _stop;
 		std::chrono::high_resolution_clock::time_point _start_p, _stop_p;
+		std::chrono::high_resolution_clock::time_point _timeout;
 		float _cpuTime;
 	public:
 		float parse, solve, simp;
 		float vo, ve, hse, bce, ere, cot, rot, sot, gc, io;
-		TIMER			() { memset(this, 0, sizeof(*this)); }
-		void start		() { _start = std::chrono::high_resolution_clock::now(); }
-		void stop		() { _stop = std::chrono::high_resolution_clock::now(); }
-		float cpuTime	() { return _cpuTime = ((float)std::chrono::duration_cast<std::chrono::milliseconds>(_stop - _start).count()) / 1000; }
-		void pstart		() { _start_p = std::chrono::high_resolution_clock::now(); }
-		void pstop		() { _stop_p = std::chrono::high_resolution_clock::now(); }
-		float pcpuTime	() { return _cpuTime = ((float)std::chrono::duration_cast<std::chrono::milliseconds>(_stop_p - _start_p).count()) / 1000; }
+		TIMER				() { memset(this, 0, sizeof(*this)); }
+		void start			() { _start = std::chrono::high_resolution_clock::now(); }
+		void stop			() { _stop = std::chrono::high_resolution_clock::now(); }
+		float cpuTime		() { return _cpuTime = ((float)std::chrono::duration_cast<std::chrono::milliseconds>(_stop - _start).count()) / 1000; }
+		void pstart			() { _start_p = std::chrono::high_resolution_clock::now(); }
+		void pstop			() { _stop_p = std::chrono::high_resolution_clock::now(); }
+		float pcpuTime		() { return _cpuTime = ((float)std::chrono::duration_cast<std::chrono::milliseconds>(_stop_p - _start_p).count()) / 1000; }
+		void setTimeout		(int seconds) { _timeout = std::chrono::high_resolution_clock::now() + std::chrono::seconds(seconds); }
+		bool checkTimeout	() {
+			std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();
+			return std::chrono::duration_cast<std::chrono::milliseconds>(_timeout - now).count() < 0;
+		}
 	};
 	//====================================================//
 	//                 iterators & checkers               //

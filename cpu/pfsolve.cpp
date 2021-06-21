@@ -48,6 +48,7 @@ ParaFROST::ParaFROST(const string& _path) :
 	if (!parser() || BCP()) { cnfstate = UNSAT, killSolver(); }
 	if (opts.parse_only_en) killSolver();
 	if (verbose == 1) printTable();
+	if (opts.timeout > 0) timer.setTimeout(opts.timeout);
 }
 
 bool ParaFROST::parser() {
@@ -183,7 +184,9 @@ void ParaFROST::solve()
 	if (canPreSigmify()) sigmify();
 	PFLOG2(2, "-- CDCL search started..");
 	if (cnfstate == UNSOLVED) MDMInit();
-	while (cnfstate == UNSOLVED && !interrupted()) {
+	while (cnfstate == UNSOLVED) {
+		if (opts.timeout > 0 && timer.checkTimeout()) handler_mercy_timeout(0);
+		if (interrupted()) break;
 		PFLDL(this, 3);
 		if (BCP()) analyze();
 		else if (satisfied()) cnfstate = SAT;
@@ -197,7 +200,7 @@ void ParaFROST::solve()
 		PFLTRAIL(this, 3);
 	}
 	timer.stop(), timer.solve += timer.cpuTime();
-	PFLOG2(2, "-- CDCL search completed successfully");
+	if (!interrupted()) PFLOG2(2, "-- CDCL search completed successfully");
 	wrapup();
 }
 

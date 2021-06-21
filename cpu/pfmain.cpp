@@ -29,7 +29,6 @@ int main(int argc, char **argv)
 	BOOL_OPT opt_quiet_en("q", "enable quiet mode, same as verbose=0", false);
 	INT_OPT opt_verbose("verbose", "set the verbosity", 1, INT32R(0, 4));
 	BOOL_OPT opt_color_en("color", "enable colorful output in the console", false);
-	INT_OPT opt_timeout("timeout", "set the timeout in seconds", 0, INT32R(0, INT32_MAX));
 	if (argc == 1) PFLOGE("no input file specified");
 	try {
 		parseArguments(argc, argv);
@@ -57,7 +56,6 @@ int main(int argc, char **argv)
 		signal_handler(handler_terminate);
 		ParaFROST* pFrost = new ParaFROST(formula);
 		pfrost = pFrost;
-		if (opt_timeout > 0) set_timeout(opt_timeout);
 		signal_handler(handler_mercy_interrupt, handler_mercy_timeout);
 		pFrost->solve();
 		if (!quiet_en) PFLOG0("");

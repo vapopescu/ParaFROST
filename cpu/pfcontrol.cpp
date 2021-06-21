@@ -59,22 +59,6 @@ namespace pFROST {
 #endif
 	}
 
-	void set_timeout(int time_limit)
-	{
-#ifdef __linux__ 
-		if (time_limit != 0) {
-			rlimit rl;
-			getrlimit(RLIMIT_CPU, &rl);
-			if (rl.rlim_max == RLIM_INFINITY || (rlim_t)time_limit < rl.rlim_max) {
-				rl.rlim_cur = time_limit;
-				if (setrlimit(RLIMIT_CPU, &rl) == -1) PFLOGW("timeout cannot be set");
-			}
-		}
-#elif _WIN32
-		PFLOGW("timeout not supported on Windows");
-#endif
-	}
-
 	void handler_terminate(int)
 	{
 		fflush(stdout);

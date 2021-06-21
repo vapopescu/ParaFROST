@@ -46,6 +46,7 @@ namespace pFROST {
 		double	map_perc;
 		double	reduce_perc;
 		//------------------------------------------//
+		int		timeout;
 		int		seed;
 		int		prograte;
 		int		chrono_min;
