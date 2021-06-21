@@ -180,12 +180,12 @@ void ParaFROST::sigmify()
 			IGR();
 
 			// Stage 3
-			sortOT(true);
+			sortOT(false);
 			CE();
 
 			// Stage 4
 			if (!LCVE()) break;
-			sortOT(false);
+			sortOT(true);
 			if (stop(diff)) { ERE(); break; }
 			HSE(), VE(), BCE();
 
