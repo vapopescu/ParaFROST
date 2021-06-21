@@ -82,7 +82,7 @@ namespace pFROST {
 		float _cpuTime;
 	public:
 		float parse, solve, simp;
-		float vo, ve, hse, bce, ere, cot, rot, sot, gc, io;
+		float vo, ve, hse, bce, ere, cot, rot, sot, gc, io, ce, igr;
 		TIMER				() { memset(this, 0, sizeof(*this)); }
 		void start			() { _start = std::chrono::high_resolution_clock::now(); }
 		void stop			() { _stop = std::chrono::high_resolution_clock::now(); }

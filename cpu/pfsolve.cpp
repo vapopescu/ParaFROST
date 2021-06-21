@@ -217,6 +217,8 @@ void ParaFROST::report()
 			PFLOG1("  - OT  creation        : %-10.2f  ms", timer.cot);
 			PFLOG1("  - OT  sorting         : %-10.2f  ms", timer.sot);
 			PFLOG1("  - OT  reduction       : %-10.2f  ms", timer.rot);
+			PFLOG1("  - IGR                 : %-10.2f  ms", timer.igr);
+			PFLOG1("  - CE                  : %-10.2f  ms", timer.ce);
 			PFLOG1("  - BVE                 : %-10.2f  ms", timer.ve);
 			PFLOG1("  - HSE                 : %-10.2f  ms", timer.hse);
 			PFLOG1("  - BCE                 : %-10.2f  ms", timer.bce);

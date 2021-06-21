@@ -302,7 +302,7 @@ void ParaFROST::IGR()
 			printf("\n");
 		}*/
 
-		if (opts.profile_simp) timer.pstop(), timer.hse += timer.pcpuTime();
+		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime();
 		PFLDONE(2, 5);
 		//PFLOG2(2, " Number of SCCs in IG is %d.", (uint32)sccCount);
 		PFLREDALL(this, 2, "IGR Reductions");
@@ -321,7 +321,7 @@ void ParaFROST::CE()
 		});
 
 		workerPool.join();
-		if (opts.profile_simp) timer.pstop(), timer.hse += timer.pcpuTime();
+		if (opts.profile_simp) timer.pstop(), timer.ce += timer.pcpuTime();
 		PFLDONE(2, 5);
 		PFLREDALL(this, 2, "Clause Reductions");
 	}
