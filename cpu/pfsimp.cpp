@@ -80,19 +80,25 @@ void ParaFROST::sortOT()
 {
 	if (opts.profile_simp) timer.pstart();
 
-	workerPool.doWorkForEach((uint32)1, inf.maxVar, [this](uint32 v) {
-		assert(v);
-		uint32 p = V2L(v), n = NEG(p);
-		OL& poss = ot[p], & negs = ot[n];
-		if (opts.ce_en) {
+	if (opts.ce_en) {
+		workerPool.doWorkForEach((uint32)1, inf.maxVar, [this](uint32 v) {
+			assert(v);
+			uint32 p = V2L(v), n = NEG(p);
+			OL& poss = ot[p], & negs = ot[n];
 			std::sort(poss.data(), poss.data() + poss.size(), CNF_CMP_ABS());
 			std::sort(negs.data(), negs.data() + negs.size(), CNF_CMP_ABS());
-		}
-		else {
+		});
+	}
+	else {
+		workerPool.doWorkForEach((uint32)0, PVs.size(), [this](uint32 i) {
+			uint32& v = PVs[i];
+			assert(v);
+			uint32 p = V2L(v), n = NEG(p);
+			OL& poss = ot[p], & negs = ot[n];
 			std::sort(poss.data(), poss.data() + poss.size(), CNF_CMP_KEY());
 			std::sort(negs.data(), negs.data() + negs.size(), CNF_CMP_KEY());
-		}
-	});
+		});
+	}
 
 	workerPool.join();
 	if (opts.profile_simp) timer.pstop(), timer.sot += timer.pcpuTime();
