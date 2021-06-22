@@ -5,6 +5,7 @@
 
 # Author specified files and directories
 benchmarks/
+[Aa]ssert/
 [cg]pu/*.o
 [cg]pu/parafrost
 [cg]pu/libpfrost.a

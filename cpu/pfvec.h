@@ -25,7 +25,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <cassert>
 #include <typeinfo>
 #include <iostream>
-#include <mutex>
+#include <shared_mutex>
+#include <atomic>
 
 #ifdef __GNUC__
 #define __forceinline __attribute__((always_inline))
@@ -36,8 +37,9 @@ namespace pFROST {
 	template<class T, class S = uint32>
 	class Vec {
 		T* _mem;
-		S sz, cap, maxCap;
-		std::mutex _m;
+		std::atomic<S> sz;
+		S cap, maxCap;
+		mutable std::shared_mutex _m;
 
 		bool check(const S& idx) const {
 			if (idx >= sz) {
@@ -69,8 +71,10 @@ namespace pFROST {
 		__forceinline void		insert		(const T& val) { assert(cap > sz);  _mem[sz++] = val; }
 		__forceinline void		push		(const T& val) { if (sz == cap) reserve(sz + 1); new (_mem + sz) T(val); sz++; }
 		__forceinline void		reserve		(const S& min_cap, const S& size) { reserve(min_cap); sz = size; }
-		__forceinline void		lock		() { _m.lock(); }
-		__forceinline void		unlock		() { _m.unlock(); }
+		__forceinline void		lock		() const { _m.lock(); }
+		__forceinline void		unlock		() const { _m.unlock(); }
+		__forceinline void		lockRead	() const { _m.lock_shared(); }
+		__forceinline void		unlockRead	() const { _m.unlock_shared(); }
 		__forceinline void		init		() { maxCap = std::numeric_limits<S>::max(), _mem = NULL, sz = 0, cap = 0; }
 		__forceinline			Vec			(Vec<T, S>&& orig) { 
 			maxCap = std::numeric_limits<S>::max(), _mem = orig._mem, sz = orig.sz, cap = orig.cap; orig.init();

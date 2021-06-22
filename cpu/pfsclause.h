@@ -21,6 +21,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "pfclause.h"
 
+#include <atomic>
+
 namespace pFROST {
 	/*****************************************************/
 	/*  Usage:    abstract clause for simp. on host      */
@@ -30,7 +32,7 @@ namespace pFROST {
 		uint32* _lits;
 		uint64 _sig;
 		int _sz, _lbd;
-		CL_ST _st, _f;
+		std::atomic<CL_ST> _st, _f;
 		std::mutex _m;
 	public:
 		SCLAUSE		() { _lits = NULL, _sz = 0, _sig = 0, _st = 0, _f = 0; }

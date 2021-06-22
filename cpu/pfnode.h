@@ -39,14 +39,18 @@ namespace pFROST {
 		inline void		appendEdge		(Vec<Edge>& vec, const uint32& lit, const S_REF& c) { vec.push(Edge(lit, c)); }
 		inline void		insertEdge		(Vec<Edge>& vec, const uint32& lit, const S_REF& c)
 		{
-			uint32 i = vec.size();
-			vec.push(Edge());
-
-			while (vec[i - 1].first > lit && i > 0) {
-				vec[i] = vec[i - 1];
-				i--;
+			uint32 i = 0;
+			while (i < vec.size() && vec[i].first < lit) {
+				i++;
 			}
 
+			if (i < vec.size() && vec[i].first == lit) return;
+			vec.push(Edge());
+
+			for (uint32 j = vec.size() - 1; j > i; j--) {
+				vec[j] = vec[j - 1];
+			}
+			
 			vec[i] = Edge(lit, c);
 		}
 		inline void		deleteEdge		(Vec<Edge>& vec, const uint32& lit)
@@ -71,7 +75,7 @@ namespace pFROST {
 			return retVal;
 		}
 	public:
-		inline void					clear			() { _st = 0; _out.clear(true); _in.clear(true); _desc.clear(true); }
+		inline void					clear			(bool free = false) { _st = 0; _out.clear(free); _in.clear(free); _desc.clear(free); }
 		inline void					lockRead		() const { _m.lock_shared(); }
 		inline void					unlockRead		() const { _m.unlock_shared(); }
 		inline void					lock			() const { _m.lock(); }

@@ -541,9 +541,8 @@ namespace SIGmA {
 		const uint32 last = resolved.size();
 		int pos = -1;
 		for (int i = 0; i < c.size(); i++) {
-			const uint32 lit = c[i];
-			if (lit == x)
-				pos = i;
+			uint32& lit = c[i];
+			if (lit == x) pos = i;
 			resolved.push(c[i]);
 		}
 		assert(pos >= 0);
@@ -1006,7 +1005,7 @@ namespace SIGmA {
 		}
 	}
 
-	inline void clause_replace(const S_REF& c, const uint32& oldLit, const uint32& newLit, IG& ig)
+	inline bool clause_replace(const S_REF& c, const uint32& oldLit, const uint32& newLit, IG& ig)
 	{
 		// Replace literals avoiding duplication.
 		uint32 n = 0;
@@ -1017,7 +1016,7 @@ namespace SIGmA {
 		for (int k = 0; k < c->size(); k++) {
 			if (c->lit(k) == FLIP(newLit)) {
 				c->markDeleted();
-				return;
+				return false;
 			}
 			else if (c->lit(k) == oldLit) {
 				continue;
@@ -1038,9 +1037,10 @@ namespace SIGmA {
 		c->set_sig(sig);
 
 		// Update IG 
+		bool newEdge = false;
 		if (c->size() == 2) {
 			uint32 otherLit = 0;
-			if (c->lit(1) == oldLit) otherLit = c->lit(0);
+			if (c->lit(1) == newLit) otherLit = c->lit(0);
 			else otherLit = c->lit(1);
 
 			if (prevSize == 2) {
@@ -1050,42 +1050,47 @@ namespace SIGmA {
 				ig[FLIP(otherLit)].lock(); ig[FLIP(otherLit)].deleteChild(oldLit); ig[FLIP(otherLit)].unlock();
 			}
 			else {
-				// TODO: notify search about new edge.
+				newEdge = true;
 			}
 
-			ig[newLit].lock(); ig[newLit].appendParent(FLIP(otherLit), c); ig[newLit].sortEdges(); ig[newLit].unlock();
-			ig[otherLit].lock(); ig[otherLit].appendParent(FLIP(newLit), c); ig[otherLit].sortEdges(); ig[otherLit].unlock();
-			ig[FLIP(newLit)].lock(); ig[FLIP(newLit)].appendChild(otherLit, c); ig[FLIP(newLit)].sortEdges(); ig[FLIP(newLit)].unlock();
-			ig[FLIP(otherLit)].lock(); ig[FLIP(otherLit)].appendChild(newLit, c); ig[FLIP(otherLit)].sortEdges(); ig[FLIP(otherLit)].unlock();
+			ig[newLit].lock(); ig[newLit].insertParent(FLIP(otherLit), c); ig[newLit].unlock();
+			ig[otherLit].lock(); ig[otherLit].insertParent(FLIP(newLit), c); ig[otherLit].unlock();
+			ig[FLIP(newLit)].lock(); ig[FLIP(newLit)].insertChild(otherLit, c); ig[FLIP(newLit)].unlock();
+			ig[FLIP(otherLit)].lock(); ig[FLIP(otherLit)].insertChild(newLit, c); ig[FLIP(otherLit)].unlock();
 		}
+		return newEdge;
 	}
 
-	inline void node_reduce(const uint32& oldLit, const uint32& newLit, OT& ot, IG& ig)
+	inline bool node_reduce(const uint32& oldLit, const uint32& newLit, OT& ot, IG& ig)
 	{
-		ig[oldLit].lock();
+		bool newEdge = false;
+		ig[oldLit].lockRead();
 		if (!ig[oldLit].isReduced()) {
+			ig[oldLit].unlockRead();
 
 			// Rewrite clauses.
-			for (int i = 0; i < ot[oldLit].size(); i++) {
+			ot[oldLit].lock();
+			for (uint32 i = 0; i < ot[oldLit].size(); i++) {
 				if (!ot[oldLit][i]->deleted()) {
-					ig[oldLit].unlock();
-					clause_replace(ot[oldLit][i], oldLit, newLit, ig);
-					ig[oldLit].lock();
+					S_REF& c = ot[oldLit][i];
+
+					c->lock();
+					newEdge = clause_replace(c, oldLit, newLit, ig);
+					c->unlock();
+
+					ot[newLit].lock(); ot[newLit].push(c); ot[newLit].unlock();
 				}
 			}
-
-			// Update occurence table.
-			ot[newLit].unionize(ot[oldLit]);
-			ot[oldLit].clear();
-
-			// Clear edges.
-			ig[oldLit].clear();
+			ot[oldLit].clear(true);
+			ot[oldLit].unlock();
 
 			// Mark node as reduced and add reference to the node it was replaced with.
+			ig[oldLit].clear(true);
 			ig[oldLit].markReduced();
 			ig[oldLit].descendants().push(newLit);
 		}
-		ig[oldLit].unlock();
+		else ig[oldLit].unlockRead();
+		return newEdge;
 	}
 
 }

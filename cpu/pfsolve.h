@@ -621,7 +621,7 @@ namespace pFROST {
 		void	shrinkSimp			();
 		void	sigmify				();
 		bool	LCVE				();
-		bool	prop				();
+		int		prop				();
 		void	bve					();
 		void	IGR					();
 		void	CE					();

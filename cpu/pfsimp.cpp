@@ -174,7 +174,9 @@ void ParaFROST::sigmify()
 			// Stage 1
 			resizeCNF();
 			createOT();
-			if (!prop()) break;
+			int p = prop();
+			if (p > 0) { PFLREDALL(this, 2, "BCP Reductions"); }
+			else if (p < 0) break;
 
 			// Stage 2
 			IGR();

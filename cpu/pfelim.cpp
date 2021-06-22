@@ -22,32 +22,34 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 using namespace pFROST;
 using namespace SIGmA;
 
-bool ParaFROST::prop()
+int ParaFROST::prop()
 {
 	std::mutex m;
-	std::condition_variable cv1, cv2;
+	std::condition_variable cvWorker, cvMaster;
 	int working = workerPool.count();
 	bool terminate = false;
 
 	nForced = sp->propagated;
 	workerPool.doWork([&] {
+		uint32 assign;
 		while (true) {
-			std::unique_lock<std::mutex> lock(m);
-			std::function<bool()> condition = [&] { return sp->propagated < trail.size() || terminate || cnfstate == UNSAT; };
-			if (!condition()) {
-				working--;
-				cv2.notify_one();
-				cv1.wait(lock, condition);
-				working++;
+			{
+				std::unique_lock<std::mutex> lock(m);
+				std::function<bool()> condition = [&] { return sp->propagated < trail.size() || terminate || cnfstate == UNSAT; };
+				if (!condition()) {
+					working--;
+					cvMaster.notify_one();
+					cvWorker.wait(lock, condition);
+					working++;
+				}
+				if (terminate) break;
+				else if (cnfstate == UNSAT) {
+					working--;
+					cvMaster.notify_one();
+					break;
+				}
+				assign = trail[sp->propagated++];
 			}
-			if (terminate) break;
-			else if (cnfstate == UNSAT) {
-				working--;
-				cv2.notify_one();
-				break;
-			}
-			uint32 assign = trail[sp->propagated++];
-			lock.unlock();
 
 			assert(assign > 1);
 			uint32 f_assign = FLIP(assign);
@@ -57,11 +59,13 @@ bool ParaFROST::prop()
 			for (int i = 0; i < ot[f_assign].size(); i++) {
 				S_REF c = ot[f_assign][i];
 				//c->print();
+				c->lock();
 				assert(c->size());
-				if (c->deleted() || propClause(c, f_assign)) continue; // clause satisfied
+				if (c->deleted() || propClause(c, f_assign)) { c->unlock(); continue; } // clause satisfied
 				// clause is unit or conflict
 				// Note: attach & strengthen don't check for conflict before enqueue
 				if (c->size() == 0) {
+					c->unlock();
 					std::unique_lock<std::mutex> lock(m);
 					cnfstate = UNSAT;
 					break;
@@ -71,14 +75,15 @@ bool ParaFROST::prop()
 					std::unique_lock<std::mutex> lock(m);
 					if (unassigned(**c)) {
 						enqueueOrg(**c);
-						cv1.notify_one();
-						lock.unlock();
+						cvWorker.notify_one();
 					}
 					else {
 						cnfstate = UNSAT;
+						c->unlock();
 						break;
 					}
 				}
+				c->unlock();
 			}
 			// delete assign lists
 			ot[assign].clear(true), ot[f_assign].clear(true);
@@ -86,19 +91,17 @@ bool ParaFROST::prop()
 	});
 
 	std::unique_lock<std::mutex> lock(m);
-	cv2.wait(lock, [&working] { return working == 0; });
+	cvMaster.wait(lock, [&working] { return working == 0; });
 	terminate = true;
-	cv1.notify_all();
+	cvWorker.notify_all();
 	lock.unlock();
 	workerPool.join();
 
-	if (cnfstate == UNSAT) return false;
+	if (cnfstate == UNSAT) return -1;
 	nForced = sp->propagated - nForced;
-	if (nForced) {
-		PFLREDALL(this, 2, "BCP Reductions");
-		nForced = 0;
-	}
-	return true;
+	assert(nForced >= 0);
+	int retval = nForced;
+	return retval;
 }
 
 void ParaFROST::IGR()
@@ -107,88 +110,117 @@ void ParaFROST::IGR()
 		if (interrupted()) killSolver();
 		PFLOGN2(2, " Reasoning on the implication graph..");
 		if (opts.profile_simp) timer.pstart();
+		bool done = false;
 
 		workerPool.doWorkForEach((uint32)0, inf.nDualVars, [this](uint32 i) {
 			ig[i].clear();
 		});
 
 		workerPool.join();
-		workerPool.doWorkForEach((size_t)0, scnf.size(), [this](size_t i) {
-			S_REF c = scnf[i];
-			if (!c->deleted() && c->size() == 2) {
-				uint32 lit1 = c->lit(0), lit2 = c->lit(1);
-				ig[lit1].lock(); ig[lit1].appendParent(FLIP(lit2), c); ig[lit1].unlock();
-				ig[lit2].lock(); ig[lit2].appendParent(FLIP(lit1), c); ig[lit2].unlock();
-				ig[FLIP(lit1)].lock(); ig[FLIP(lit1)].appendChild(lit2, c); ig[FLIP(lit1)].unlock();
-				ig[FLIP(lit2)].lock(); ig[FLIP(lit2)].appendChild(lit1, c); ig[FLIP(lit2)].unlock();
+
+		while (!done) {
+			// Propagate boolean constraints
+			std::mutex propagateMutex;
+			if (sp->propagated < trail.size()) {
+				if (prop() < 0) break;
 			}
-		});
-		workerPool.join();
 
-		SCCWrapper wrapper;
-		wrapper.setNumThreads(opts.worker_count);
-		wrapper.setMethod(SCC_UFSCC);
-		wrapper.setGraph(ig);
+			// Initialize IG based on original binary clauses.
+			workerPool.doWorkForEach((size_t)0, scnf.size(), [this](size_t i) {
+				S_REF c = scnf[i];
+				if (!c->deleted() && c->size() == 2) {
+					uint32 lit1 = c->lit(0), lit2 = c->lit(1);
+					ig[lit1].lock(); ig[lit1].insertParent(FLIP(lit2), c); ig[lit1].unlock();
+					ig[lit2].lock(); ig[lit2].insertParent(FLIP(lit1), c); ig[lit2].unlock();
+					ig[FLIP(lit1)].lock(); ig[FLIP(lit1)].insertChild(lit2, c); ig[FLIP(lit1)].unlock();
+					ig[FLIP(lit2)].lock(); ig[FLIP(lit2)].insertChild(lit1, c); ig[FLIP(lit2)].unlock();
+				}
+			});
+			workerPool.join();
 
-		node_t *scc = wrapper.getSCC();
-		std::atomic<uint32> sccCount = 0;
+			// SCC equivalence reduction
+			bool sccScan = true;
+			while (sccScan) {
+				SCCWrapper wrapper;
+				wrapper.setNumThreads(opts.worker_count);
+				wrapper.setMethod(SCC_UFSCC);
+				wrapper.setGraph(ig);
 
-		workerPool.doWorkForEach((uint32)1, inf.maxVar, [&](uint32 v) {
-			const uint32 lit = V2L(v);
-			const uint32& repLit = scc[lit];
-			scc[FLIP(lit)] = FLIP(repLit);
-		});
-		workerPool.join();
+				node_t* scc = wrapper.getSCC();
+				std::atomic<uint32> sccCount = 0;
+				std::atomic<bool> newEdge = false;
 
-		workerPool.doWorkForEach((uint32)1, inf.maxVar, [&](uint32 v) {
-			const uint32 lit = V2L(v);
-			const uint32& repLit = scc[lit];
+				workerPool.doWorkForEach((uint32)1, inf.maxVar, [&](uint32 v) {
+					const uint32 lit = V2L(v);
+					scc[FLIP(lit)] = FLIP(scc[lit]);
+				});
+				workerPool.join();
 
-			if (lit == repLit) sccCount++;
-			else {
-				node_reduce(lit, repLit, ot, ig);
-				node_reduce(FLIP(lit), FLIP(repLit), ot, ig);
-				sp->vstate[v] = MELTED, v = 0;
-			}
-		});
-		workerPool.join();
-		delete[] scc;
+				workerPool.doWorkForEach((uint32)1, inf.maxVar, [&](uint32 v) {
+					const uint32 lit = V2L(v);
+					const uint32& repLit = scc[lit];
 
-		std::deque<uint32> queue;
-		std::mutex m;
-		std::condition_variable cv1, cv2;
-		int working = workerPool.count();
-		bool terminate = false;
-
-		workerPool.doWorkForEach((uint32)2, inf.nDualVars, [&](uint32 lit) {
-			ig[lit].sortEdges();
-			if (ig[lit].isDeadEnd()) { std::unique_lock lock(m); queue.push_back(lit); }
-		});
-		workerPool.join();
-
-		workerPool.doWork([&] {
-			uint32 lit = 0;
-			while (true) {
-				{
-					std::unique_lock lock(m);
-					std::function<bool()> condition = [&] { return !queue.empty() || terminate; };
-					if (!condition()) {
-						working--;
-						cv2.notify_one();
-						cv1.wait(lock, condition);
-						working++;
+					if (lit == repLit) sccCount++;
+					else {
+						bool n = false;
+						n |= node_reduce(lit, repLit, ot, ig);
+						n |= node_reduce(FLIP(lit), FLIP(repLit), ot, ig);
+						if (n) newEdge = true;
+						sp->vstate[v] = MELTED, v = 0;
 					}
-					if (terminate) break;
-					lit = queue.front();
-					queue.pop_front();
+				});
+				workerPool.join();
+				delete[] scc;
+				if (!newEdge) sccScan = false;
+			}
+
+			// TODO: reset SCC ancestor nodes.
+
+			// Explore IG
+			uVec1D exploreQueue;
+			std::mutex exploreMutex;
+			std::condition_variable exploreWorker, exploreMaster;
+			std::atomic<uint32> exploreIdx = 0;
+			int exploreWorking = workerPool.count();
+			bool exploreTerminate = false;
+			exploreQueue.reserve(inf.nDualVars);
+
+			workerPool.doWorkForEach((uint32)2, inf.nDualVars, [&](uint32 lit) {
+				bool explore = true;
+				Vec<Edge>& cs = ig[lit].children();
+
+				for (int i = 0; i < cs.size(); i++) {
+					if (!ig[cs[i].first].isExplored()) {
+						explore = false;
+						break;
+					}
 				}
 
-				do { // visit()
+				if (explore) { std::unique_lock lock(exploreMutex); exploreQueue.push(lit); }
+			});
+			workerPool.join();
+
+			workerPool.doWork([&] {
+				uint32 lit = 0;
+				while (true) {
+					{
+						std::unique_lock lock(exploreMutex);
+						std::function<bool()> condition = [&] { return exploreIdx < exploreQueue.size() || exploreTerminate; };
+						if (!condition()) {
+							exploreWorking--;
+							exploreMaster.notify_one();
+							exploreWorker.wait(lock, condition);
+							exploreWorking++;
+						}
+						if (exploreTerminate) break;
+						lit = exploreQueue[exploreIdx++];
+					}
+
 					ig[lit].lockRead();
 
-					Vec<Edge>&	ps = ig[lit].parents();
-					Vec<Edge>&	cs = ig[lit].children();
-					uVec1D&		ds = ig[lit].descendants();
+					Vec<Edge>& ps = ig[lit].parents();
+					Vec<Edge>& cs = ig[lit].children();
+					uVec1D& ds = ig[lit].descendants();
 
 					// If the node got reduced, check the reference.
 					while (ig[lit].isReduced()) {
@@ -201,8 +233,7 @@ void ParaFROST::IGR()
 					// Early return. Nothing left to do.
 					if (ig[lit].isExplored()) {
 						ig[lit].unlockRead();
-						lit = 0;
-						break; // "return"
+						continue;
 					}
 
 					// Check if all children are explored.
@@ -222,10 +253,7 @@ void ParaFROST::IGR()
 					ig[lit].unlockRead();
 
 					// Cannot procede if not all children are explored.
-					if (!childrenExplored) {
-						lit = 0;
-						break; // "return"
-					}
+					if (!childrenExplored) continue;
 
 					ig[lit].lock();
 					for (uint32 i = 0; i < cs.size(); i++) {
@@ -245,6 +273,7 @@ void ParaFROST::IGR()
 								else break;
 							}
 
+							// Gather descendants.
 							if (!redundant) {
 								uVec1D grandchildren;
 								auto& gcs = ig[c].children();
@@ -261,29 +290,67 @@ void ParaFROST::IGR()
 							ig[c].unlockRead();
 						}
 					}
-					
+
+					// Check if literal is failed.
+					uint32 flipLit = FLIP(lit);
+					bool failed = false;
+					for (uint32 i = 0; i < ds.size(); i++) {
+						if (flipLit == ds[i]) {
+							ig[lit].unlock();
+							ig[flipLit].lockRead();
+							propagateMutex.lock();
+
+							{
+								uVec1D& units = ig[flipLit].descendants();
+								for (uint32 j = 0; j < units.size(); j++) {
+									if (unassigned(units[j])) enqueueOrg(units[j]);
+								}
+							}
+
+							{
+								Vec<Edge>& units = ig[flipLit].children();
+								for (uint32 j = 0; j < units.size(); j++) {
+									if (unassigned(units[j].first)) enqueueOrg(units[j].first);
+								}
+							}
+
+							if (unassigned(flipLit)) enqueueOrg(flipLit);
+
+							propagateMutex.unlock();
+							ig[flipLit].unlockRead();
+							failed = true;
+							break;
+						}
+					}
+
+					if (failed) continue;
+
+					// Queue parents for exploration.
 					if (!ps.empty()) {
-						std::unique_lock lock(m);
+						std::unique_lock lock(exploreMutex);
 						for (uint32 i = 0; i < ps.size(); i++) {
 							if (!ps[i].second->deleted()) {
-								queue.push_back(ps[i].first);
-								cv1.notify_one();
+								exploreQueue.push(ps[i].first);
+								exploreWorker.notify_one();
 							}
 						}
 					}
 
 					ig[lit].markExplored();
 					ig[lit].unlock();
-				} while (false); // point to "return" to.
-			}
-		});
+				}
+			});
 
-		std::unique_lock<std::mutex> lock(m);
-		cv2.wait(lock, [&working] { return working == 0; });
-		terminate = true;
-		cv1.notify_all();
-		lock.unlock();
-		workerPool.join();
+			std::unique_lock<std::mutex> lock(exploreMutex);
+			exploreMaster.wait(lock, [&] { return exploreWorking == 0 || exploreTerminate; });
+			exploreTerminate = true;
+			exploreWorker.notify_all();
+			lock.unlock();
+			workerPool.join();
+
+			// Exit condition
+			if (trail.size() == sp->propagated && exploreIdx == exploreQueue.size()) done = true;
+		}
 
 		/*for (uint32 i = 2; i < inf.nDualVars; i++) {
 			printf("ig[%d]:\n", i);
