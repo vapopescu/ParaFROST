@@ -90,11 +90,12 @@ int ParaFROST::prop()
 		}
 	});
 
-	std::unique_lock<std::mutex> lock(m);
-	cvMaster.wait(lock, [&working] { return working == 0; });
-	terminate = true;
-	cvWorker.notify_all();
-	lock.unlock();
+	{
+		std::unique_lock lock(m);
+		cvMaster.wait(lock, [&working] { return working == 0; });
+		terminate = true;
+		cvWorker.notify_all();
+	}
 	workerPool.join();
 
 	if (cnfstate == UNSAT) return -1;
@@ -113,7 +114,7 @@ void ParaFROST::IGR()
 		bool done = false;
 
 		workerPool.doWorkForEach((uint32)0, inf.nDualVars, [this](uint32 i) {
-			ig[i].clear();
+			ig[i].clear(true);
 		});
 
 		workerPool.join();
@@ -139,7 +140,10 @@ void ParaFROST::IGR()
 			workerPool.join();
 
 			// SCC equivalence reduction
+			uVec1D resetQueue;
+			resetQueue.reserve(inf.nDualVars);
 			bool sccScan = true;
+
 			while (sccScan) {
 				SCCWrapper wrapper;
 				wrapper.setNumThreads(opts.worker_count);
@@ -167,6 +171,10 @@ void ParaFROST::IGR()
 						n |= node_reduce(FLIP(lit), FLIP(repLit), ot, ig);
 						if (n) newEdge = true;
 						sp->vstate[v] = MELTED, v = 0;
+
+						resetQueue.lock();
+						resetQueue.push(lit);
+						resetQueue.unlock();
 					}
 				});
 				workerPool.join();
@@ -174,10 +182,106 @@ void ParaFROST::IGR()
 				if (!newEdge) sccScan = false;
 			}
 
-			// TODO: reset SCC ancestor nodes.
+			// Reset SCC ancestor nodes.
+			std::mutex resetMutex;
+			std::condition_variable resetWorker, resetMaster;
+			std::atomic<uint32> resetIdx = 0;
+			int resetWorking = workerPool.count();
+			bool resetTerminate = false;
+
+			workerPool.doWork([&] {
+				uint32 lit = 0;
+				while (true) {
+					if (lit == 0) {
+						std::unique_lock lock(resetMutex);
+						std::function<bool()> condition = [&] { return resetIdx < resetQueue.size() || resetTerminate; };
+						if (!condition()) {
+							resetWorking--;
+							resetMaster.notify_one();
+							resetWorker.wait(lock, condition);
+							resetWorking++;
+						}
+						if (resetTerminate) break;
+						lit = resetQueue[resetIdx++];
+					}
+
+					ig[lit].lock();
+					uint32 newLit = 0;
+
+					if (ig[lit].isExplored()) {
+						// Reset node.
+						ig[lit].markUnexplored();
+
+						// Queue parents for reset.
+						Vec<Edge>& ps = ig[lit].parents();
+						if (!ps.empty()) {
+							if (ps.size() > 1) {
+								std::unique_lock lock(resetMutex);
+								for (uint32 i = 1; i < ps.size(); i++) {
+									if (!ps[i].second->deleted()) {
+										resetQueue.push(ps[i].first);
+										resetWorker.notify_one();
+									}
+								}
+							}
+							newLit = ps[0].first;
+						}
+					}
+
+					ig[lit].unlock();
+					lit = newLit;
+				}
+			});
+
+			{
+				std::unique_lock lock(resetMutex);
+				resetMaster.wait(lock, [&] { return resetWorking == 0 || resetTerminate; });
+				resetTerminate = true;
+				resetWorker.notify_all();
+			}
+			workerPool.join();
+
+			// Scan IG for exploration starting points.
+			uVec1D exploreQueue;
+
+			workerPool.doWorkForEach((uint32)2, inf.nDualVars, [&](uint32 lit) {
+				if (!ig[lit].isExplored()) {
+					bool explore = true;
+					bool deadEnd = true;
+					Vec<Edge>& ps = ig[lit].parents();
+					Vec<Edge>& cs = ig[lit].children();
+					ig[lit].lockRead();
+
+					for (int i = 0; i < cs.size(); i++) {
+						if (!cs[i].second->deleted()) {
+							deadEnd == false;
+							uint32& child = cs[i].first;
+
+							ig[child].lockRead();
+							if (!ig[child].isExplored()) {
+								ig[child].unlockRead();
+								explore = false;
+								break;
+							}
+							ig[child].unlockRead();
+						}
+					}
+
+					if (deadEnd && ig[lit].isOrphan()) {
+						ig[lit].markExplored(); // nothing to do for this node
+					}
+					else if (explore) {
+						exploreQueue.lock();
+						exploreQueue.push(lit);
+						exploreQueue.unlock();
+					}
+
+					ig[lit].unlockRead();
+				}
+			});
+			workerPool.join();
 
 			// Explore IG
-			uVec1D exploreQueue;
 			std::mutex exploreMutex;
 			std::condition_variable exploreWorker, exploreMaster;
 			std::atomic<uint32> exploreIdx = 0;
@@ -185,25 +289,10 @@ void ParaFROST::IGR()
 			bool exploreTerminate = false;
 			exploreQueue.reserve(inf.nDualVars);
 
-			workerPool.doWorkForEach((uint32)2, inf.nDualVars, [&](uint32 lit) {
-				bool explore = true;
-				Vec<Edge>& cs = ig[lit].children();
-
-				for (int i = 0; i < cs.size(); i++) {
-					if (!ig[cs[i].first].isExplored()) {
-						explore = false;
-						break;
-					}
-				}
-
-				if (explore) { std::unique_lock lock(exploreMutex); exploreQueue.push(lit); }
-			});
-			workerPool.join();
-
 			workerPool.doWork([&] {
 				uint32 lit = 0;
 				while (true) {
-					{
+					if (lit == 0) {
 						std::unique_lock lock(exploreMutex);
 						std::function<bool()> condition = [&] { return exploreIdx < exploreQueue.size() || exploreTerminate; };
 						if (!condition()) {
@@ -233,6 +322,7 @@ void ParaFROST::IGR()
 					// Early return. Nothing left to do.
 					if (ig[lit].isExplored()) {
 						ig[lit].unlockRead();
+						lit = 0;
 						continue;
 					}
 
@@ -253,7 +343,10 @@ void ParaFROST::IGR()
 					ig[lit].unlockRead();
 
 					// Cannot procede if not all children are explored.
-					if (!childrenExplored) continue;
+					if (!childrenExplored) {
+						lit = 0;
+						continue;
+					}
 
 					ig[lit].lock();
 					for (uint32 i = 0; i < cs.size(); i++) {
@@ -296,7 +389,10 @@ void ParaFROST::IGR()
 					bool failed = false;
 					for (uint32 i = 0; i < ds.size(); i++) {
 						if (flipLit == ds[i]) {
+							ig[lit].clear(true);
+							ig[lit].markExplored();
 							ig[lit].unlock();
+
 							ig[flipLit].lockRead();
 							propagateMutex.lock();
 
@@ -323,51 +419,72 @@ void ParaFROST::IGR()
 						}
 					}
 
-					if (failed) continue;
+					if (failed) {
+						lit = 0;
+						continue;
+					}
 
 					// Queue parents for exploration.
+					uint32 newLit = 0;
 					if (!ps.empty()) {
-						std::unique_lock lock(exploreMutex);
-						for (uint32 i = 0; i < ps.size(); i++) {
-							if (!ps[i].second->deleted()) {
-								exploreQueue.push(ps[i].first);
-								exploreWorker.notify_one();
+						if (ps.size() > 1) {
+							std::unique_lock lock(exploreMutex);
+							for (uint32 i = 1; i < ps.size(); i++) {
+								if (!ps[i].second->deleted()) {
+									exploreQueue.push(ps[i].first);
+									exploreWorker.notify_one();
+								}
 							}
 						}
+						newLit = ps[0].first;
 					}
 
 					ig[lit].markExplored();
 					ig[lit].unlock();
+					lit = newLit;
 				}
 			});
 
-			std::unique_lock<std::mutex> lock(exploreMutex);
-			exploreMaster.wait(lock, [&] { return exploreWorking == 0 || exploreTerminate; });
-			exploreTerminate = true;
-			exploreWorker.notify_all();
-			lock.unlock();
+			{
+				std::unique_lock lock(exploreMutex);
+				exploreMaster.wait(lock, [&] { return exploreWorking == 0 || exploreTerminate; });
+				exploreTerminate = true;
+				exploreWorker.notify_all();
+			}
 			workerPool.join();
 
 			// Exit condition
 			if (trail.size() == sp->propagated && exploreIdx == exploreQueue.size()) done = true;
 		}
 
-		/*for (uint32 i = 2; i < inf.nDualVars; i++) {
-			printf("ig[%d]:\n", i);
-			printf("\tparents: ");
-			for (uint32 j = 0; j < ig[i].parents().size(); j++) {
-				printf("%d, ", ig[i].parents()[j].first);
+		// Sanity check.
+#ifdef IGR_DBG
+		std::mutex printMutex;
+		workerPool.doWorkForEach((uint32)2, inf.nDualVars, [&](uint32 i) {
+			if (!ig[i].isExplored()) {
+				std::unique_lock lock(printMutex);
+				printf("ig[%d]:\n", i);
+				printf("\tparents: ");
+				for (uint32 j = 0; j < ig[i].parents().size(); j++) {
+					if (!ig[i].parents()[j].second->deleted()) {
+						printf("%d, ", ig[i].parents()[j].first);
+					}
+				}
+				printf("\n\tchildren: ");
+				for (uint32 j = 0; j < ig[i].children().size(); j++) {
+					if (!ig[i].children()[j].second->deleted()) {
+						printf("%d, ", ig[i].children()[j].first);
+					}
+				}
+				printf("\n\tdescendants: ");
+				for (uint32 j = 0; j < ig[i].descendants().size(); j++) {
+					printf("%d, ", ig[i].descendants()[j]);
+				}
+				printf("\n");
 			}
-			printf("\n\tchildren: ");
-			for (uint32 j = 0; j < ig[i].children().size(); j++) {
-				printf("%d, ", ig[i].children()[j].first);
-			}
-			printf("\n\tdescendants: ");
-			for (uint32 j = 0; j < ig[i].descendants().size(); j++) {
-				printf("%d, ", ig[i].descendants()[j]);
-			}
-			printf("\n");
-		}*/
+		});
+		workerPool.join();
+#endif
 
 		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime();
 		PFLDONE(2, 5);

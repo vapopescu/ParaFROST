@@ -94,6 +94,9 @@ namespace pFROST {
 		inline void					markVisited		() { _st |= _VISITED_; }
 		inline void					markExplored	() { _st |= _EXPLORED_; }
 		inline void					markReduced		() { _st |= _REDUCED_; }
+		inline void					markUnvisited	() { _st &= ~_VISITED_; }
+		inline void					markUnexplored	() { _st &= ~_EXPLORED_; }
+		inline void					markUnreduced	() { _st &= ~_REDUCED_; }
 		inline Vec<Edge>&			children		() { return _out; }
 		inline const Vec<Edge>&		children		() const { return _out; }
 		inline Vec<Edge>&			parents			() { return _in; }
