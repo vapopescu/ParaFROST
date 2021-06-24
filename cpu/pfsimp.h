@@ -1085,9 +1085,11 @@ namespace SIGmA {
 			ot[oldLit].unlock();
 
 			// Mark node as reduced and add reference to the node it was replaced with.
+			ig[oldLit].lock();
 			ig[oldLit].clear(true);
 			ig[oldLit].markReduced();
 			ig[oldLit].descendants().push(newLit);
+			ig[oldLit].unlock();
 		}
 		else ig[oldLit].unlockRead();
 		return newEdge;
