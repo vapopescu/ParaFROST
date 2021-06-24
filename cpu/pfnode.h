@@ -75,6 +75,8 @@ namespace pFROST {
 			return retVal;
 		}
 	public:
+		inline						Node			() { _st = 0; }
+		inline						~Node			() { clear(true); }
 		inline void					clear			(bool free = false) { _st = 0; _out.clear(free); _in.clear(free); _desc.clear(free); }
 		inline void					lockRead		() const { _m.lock_shared(); }
 		inline void					unlockRead		() const { _m.unlock_shared(); }

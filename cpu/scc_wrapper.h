@@ -24,6 +24,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "common_main.h"
 #include "gm.h"
 
+#include <omp.h>
+
 extern node_t* G_SCC;
 extern int32_t G_num_nodes;
 
@@ -71,19 +73,12 @@ namespace pFROST {
 				}
 			});
 			pfrost->workerPool.join();
-
-			/*for (uint32 i = 0; i < inf.nDualVars; i++) {
-				for (uint32 j = 0; j < ig[i].children().size(); j++) {
-					if (!ig[i].children()[j].second->deleted()) {
-						G.add_edge(i, ig[i].children()[j].first);
-					}
-				}
-			}*/
 		}
 
 		inline node_t* getSCC() {
 			// Initialize
 			gm_rt_initialize();
+			omp_set_num_threads(num_threads);
 			G.make_reverse_edges();
 
 			G_num_nodes = G.num_nodes();

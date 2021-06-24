@@ -30,7 +30,7 @@ int ParaFROST::prop()
 	nForced = sp->propagated;
 
 	workerPool.doWork([&] {
-		uint32 assign;
+		uint32 assign = 0;
 		while (true) {
 			{
 				std::unique_lock<std::mutex> lock(m);
@@ -106,7 +106,6 @@ void ParaFROST::IGR()
 		workerPool.doWorkForEach((uint32)0, inf.nDualVars, [this](uint32 i) {
 			ig[i].clear(true);
 		});
-
 		workerPool.join();
 
 		while (!done) {
@@ -170,6 +169,7 @@ void ParaFROST::IGR()
 					}
 				});
 				workerPool.join();
+
 				delete[] scc;
 				if (!newEdge) sccScan = false;
 			}
@@ -439,6 +439,7 @@ void ParaFROST::IGR()
 		// Sanity check.
 #ifdef IGR_DBG
 		std::mutex printMutex;
+		bool ok = true;
 		workerPool.doWorkForEach((uint32)2, inf.nDualVars, [&](uint32 i) {
 			if (!ig[i].isExplored()) {
 				std::unique_lock lock(printMutex);
@@ -460,9 +461,11 @@ void ParaFROST::IGR()
 					printf("%d, ", ig[i].descendants()[j]);
 				}
 				printf("\n");
+				ok = false;
 			}
 		});
 		workerPool.join();
+		assert(ok);
 #endif
 
 		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime();
