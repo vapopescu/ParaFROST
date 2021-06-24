@@ -150,6 +150,7 @@ void ParaFROST::IGR()
 				wrapper.setMethod(SCC_UFSCC);
 				wrapper.setGraph(ig);
 
+				// Compute SCC for each node.
 				node_t* scc = wrapper.getSCC();
 				std::atomic<uint32> sccCount = 0;
 				std::atomic<bool> newEdge = false;
@@ -160,6 +161,7 @@ void ParaFROST::IGR()
 				});
 				workerPool.join();
 
+				// Replace each node with its SCC representative.
 				workerPool.doWorkForEach((uint32)1, inf.maxVar, [&](uint32 v) {
 					const uint32 lit = V2L(v);
 					const uint32& repLit = scc[lit];
@@ -248,7 +250,6 @@ void ParaFROST::IGR()
 				if (!ig[lit].isExplored()) {
 					bool explore = true;
 					bool deadEnd = true;
-					Vec<Edge>& ps = ig[lit].parents();
 					Vec<Edge>& cs = ig[lit].children();
 					ig[lit].lockRead();
 
