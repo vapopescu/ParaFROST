@@ -25,28 +25,24 @@ using namespace SIGmA;
 int ParaFROST::prop()
 {
 	std::mutex m;
-	std::condition_variable cvWorker, cvMaster;
+	std::condition_variable cv;
 	int working = workerPool.count();
-	bool terminate = false;
-
 	nForced = sp->propagated;
+
 	workerPool.doWork([&] {
 		uint32 assign;
 		while (true) {
 			{
 				std::unique_lock<std::mutex> lock(m);
-				std::function<bool()> condition = [&] { return sp->propagated < trail.size() || terminate || cnfstate == UNSAT; };
+				std::function<bool()> condition = [&] { return sp->propagated < trail.size() || cnfstate == UNSAT || working == 0; };
 				if (!condition()) {
 					working--;
-					cvMaster.notify_one();
-					cvWorker.wait(lock, condition);
+
+					if (working == 0) cv.notify_all();
+					else cv.wait(lock, condition);
+
+					if (sp->propagated == trail.size() || cnfstate == UNSAT) break;
 					working++;
-				}
-				if (terminate) break;
-				else if (cnfstate == UNSAT) {
-					working--;
-					cvMaster.notify_one();
-					break;
 				}
 				assign = trail[sp->propagated++];
 			}
@@ -75,7 +71,7 @@ int ParaFROST::prop()
 					std::unique_lock<std::mutex> lock(m);
 					if (unassigned(**c)) {
 						enqueueOrg(**c);
-						cvWorker.notify_one();
+						cv.notify_one();
 					}
 					else {
 						cnfstate = UNSAT;
@@ -89,19 +85,13 @@ int ParaFROST::prop()
 			ot[assign].clear(true), ot[f_assign].clear(true);
 		}
 	});
-
-	{
-		std::unique_lock lock(m);
-		cvMaster.wait(lock, [&working] { return working == 0; });
-		terminate = true;
-		cvWorker.notify_all();
-	}
 	workerPool.join();
 
 	if (cnfstate == UNSAT) return -1;
 	nForced = sp->propagated - nForced;
 	assert(nForced >= 0);
 	int retval = nForced;
+	nForced = 0;
 	return retval;
 }
 
@@ -186,24 +176,25 @@ void ParaFROST::IGR()
 
 			// Reset SCC ancestor nodes.
 			std::mutex resetMutex;
-			std::condition_variable resetWorker, resetMaster;
+			std::condition_variable resetCV;
 			std::atomic<uint32> resetIdx = 0;
 			int resetWorking = workerPool.count();
-			bool resetTerminate = false;
 
 			workerPool.doWork([&] {
 				uint32 lit = 0;
 				while (true) {
 					if (lit == 0) {
 						std::unique_lock lock(resetMutex);
-						std::function<bool()> condition = [&] { return resetIdx < resetQueue.size() || resetTerminate; };
+						std::function<bool()> condition = [&] { return resetIdx < resetQueue.size() || resetWorking == 0; };
 						if (!condition()) {
 							resetWorking--;
-							resetMaster.notify_one();
-							resetWorker.wait(lock, condition);
+
+							if (resetWorking == 0) resetCV.notify_all();
+							else resetCV.wait(lock, condition);
+
+							if (resetIdx == resetQueue.size()) break;
 							resetWorking++;
 						}
-						if (resetTerminate) break;
 						lit = resetQueue[resetIdx++];
 					}
 
@@ -222,7 +213,7 @@ void ParaFROST::IGR()
 								for (uint32 i = 1; i < ps.size(); i++) {
 									if (!ps[i].second->deleted()) {
 										resetQueue.push(ps[i].first);
-										resetWorker.notify_one();
+										resetCV.notify_one();
 									}
 								}
 							}
@@ -234,13 +225,6 @@ void ParaFROST::IGR()
 					lit = newLit;
 				}
 			});
-
-			{
-				std::unique_lock lock(resetMutex);
-				resetMaster.wait(lock, [&] { return resetWorking == 0 || resetTerminate; });
-				resetTerminate = true;
-				resetWorker.notify_all();
-			}
 			workerPool.join();
 
 			// Scan IG for exploration starting points.
@@ -255,7 +239,7 @@ void ParaFROST::IGR()
 
 					for (int i = 0; i < cs.size(); i++) {
 						if (!cs[i].second->deleted()) {
-							deadEnd == false;
+							deadEnd = false;
 							uint32& child = cs[i].first;
 
 							ig[child].lockRead();
@@ -284,10 +268,9 @@ void ParaFROST::IGR()
 
 			// Explore IG
 			std::mutex exploreMutex;
-			std::condition_variable exploreWorker, exploreMaster;
+			std::condition_variable exploreCV;
 			std::atomic<uint32> exploreIdx = 0;
 			int exploreWorking = workerPool.count();
-			bool exploreTerminate = false;
 			exploreQueue.reserve(inf.nDualVars);
 
 			workerPool.doWork([&] {
@@ -295,14 +278,16 @@ void ParaFROST::IGR()
 				while (true) {
 					if (lit == 0) {
 						std::unique_lock lock(exploreMutex);
-						std::function<bool()> condition = [&] { return exploreIdx < exploreQueue.size() || exploreTerminate; };
+						std::function<bool()> condition = [&] { return exploreIdx < exploreQueue.size() || exploreWorking == 0; };
 						if (!condition()) {
 							exploreWorking--;
-							exploreMaster.notify_one();
-							exploreWorker.wait(lock, condition);
+
+							if (exploreWorking == 0) exploreCV.notify_all();
+							else exploreCV.wait(lock, condition);
+
+							if (exploreIdx == exploreQueue.size()) break;
 							exploreWorking++;
 						}
-						if (exploreTerminate) break;
 						lit = exploreQueue[exploreIdx++];
 					}
 
@@ -433,7 +418,7 @@ void ParaFROST::IGR()
 							for (uint32 i = 1; i < ps.size(); i++) {
 								if (!ps[i].second->deleted()) {
 									exploreQueue.push(ps[i].first);
-									exploreWorker.notify_one();
+									exploreCV.notify_one();
 								}
 							}
 						}
@@ -445,13 +430,6 @@ void ParaFROST::IGR()
 					lit = newLit;
 				}
 			});
-
-			{
-				std::unique_lock lock(exploreMutex);
-				exploreMaster.wait(lock, [&] { return exploreWorking == 0 || exploreTerminate; });
-				exploreTerminate = true;
-				exploreWorker.notify_all();
-			}
 			workerPool.join();
 
 			// Exit condition
@@ -692,19 +670,19 @@ void ParaFROST::ERE()
 		m_c.reserve(INIT_CAP);
 
 		while (true) {
-			uint32 n = ti++;
-			if (n >= PVs.size()) break;
-			assert(PVs[n]);
-			uint32 p = V2L(PVs[n]);
+			uint32 i = ti++;
+			if (i >= PVs.size()) break;
+			assert(PVs[i]);
+			uint32 p = V2L(PVs[i]);
 			OL& poss = ot[p], & negs = ot[NEG(p)];
 
-			if (ot[p].size() <= opts.ere_limit && ot[n].size() <= opts.ere_limit) {
+			if (ot[p].size() <= opts.ere_limit && ot[NEG(p)].size() <= opts.ere_limit) {
 				// do merging and apply forward equality check (on-the-fly) over resolvents
 				for (int i = 0; i < poss.size(); i++) {
 					if (poss[i]->deleted()) continue;
 					for (int j = 0; j < negs.size(); j++) {
 						if (negs[j]->deleted() || (poss[i]->size() + negs[j]->size() - 2) > MAX_ERE_OUT) continue;
-						if (merge_ere(PVs[n], poss[i], negs[j], m_c)) {
+						if (merge_ere(PVs[i], poss[i], negs[j], m_c)) {
 							CL_ST type;
 							if (poss[i]->learnt() || negs[j]->learnt()) type = LEARNT;
 							else type = ORIGINAL;
