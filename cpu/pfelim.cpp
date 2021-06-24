@@ -30,7 +30,7 @@ int ParaFROST::prop()
 	nForced = sp->propagated;
 
 	workerPool.doWork([&] {
-		uint32 assign;
+		uint32 assign = 0;
 		while (true) {
 			{
 				std::unique_lock<std::mutex> lock(m);
