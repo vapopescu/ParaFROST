@@ -28,8 +28,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <mutex>
 #include <condition_variable>
 #include <functional>
-#include <deque>
 #include <vector>
+#include <map>
 
 using namespace pFROST;
 

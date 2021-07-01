@@ -180,6 +180,7 @@ void ParaFROST::sigmify()
 
 			// Stage 2
 			IGR();
+			if (cnfstate == UNSAT) return;
 
 			// Stage 3
 			sortOT(false);

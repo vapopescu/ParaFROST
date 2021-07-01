@@ -27,6 +27,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <iostream>
 #include <shared_mutex>
 #include <atomic>
+#include <initializer_list>
 
 #ifdef __GNUC__
 #define __forceinline __attribute__((always_inline))
@@ -37,8 +38,7 @@ namespace pFROST {
 	template<class T, class S = uint32>
 	class Vec {
 		T* _mem;
-		std::atomic<S> sz;
-		S cap, maxCap;
+		S sz, cap, maxCap;
 		mutable std::shared_mutex _m;
 
 		bool check(const S& idx) const {
@@ -125,8 +125,12 @@ namespace pFROST {
 			pfshrinkAlloc(_mem, sizeof(T) * sz);
 			cap = sz;
 		}
-		template<class Container = Vec<T, S>>
-		__forceinline void		copyFrom	(const Container& copy) {
+		__forceinline void		copyFrom	(const std::initializer_list<T>& copy) {
+			clear(true);
+			reserve(copy.size());
+			for (auto item : copy) push(item);
+		}
+		__forceinline void		copyFrom	(const Vec<T, S>& copy) {
 			resize(copy.size());
 			std::memcpy(_mem, copy.data(), sz * sizeof(T));
 		}
@@ -147,7 +151,7 @@ namespace pFROST {
 		__forceinline void		unionize	(const Vec<T,S>& rhs, Comparator less) {
 			if (empty()) copyFrom(rhs);
 			else if (!rhs.empty()) {
-				Vec<T, S> lhs = Vec<T, S>(*this);
+				Vec<T, S> lhs = std::move(*this);
 				expand(lhs.size() + rhs.size());
 
 				S i = 0, j = 0, k = 0;
@@ -176,6 +180,23 @@ namespace pFROST {
 				}
 				resize(k);
 			}
+		}
+		__forceinline bool		contains	(const T& item) const { return contains(item, std::less<T>()); }
+		template<class Comparator>
+		__forceinline bool		contains	(const T& item, Comparator less) const {
+			if (empty()) return false;
+
+			S begin = 0;
+			S end = size();
+			S idx = (end - begin) / 2;
+
+			while (end - begin > 1 && _mem[idx] != item) {
+				if (less(item, _mem[idx])) end = idx;
+				else begin = idx + 1;
+				idx = begin + (end - begin) / 2;
+			}
+
+			return _mem[idx] == item;
 		}
 	};
 	// vector types

@@ -33,7 +33,7 @@ namespace pFROST {
 		uint64 _sig;
 		int _sz, _lbd;
 		std::atomic<CL_ST> _st, _f;
-		std::mutex _m;
+		mutable std::mutex _m;
 	public:
 		SCLAUSE		() { _lits = NULL, _sz = 0, _sig = 0, _st = 0, _f = 0; }
 		~SCLAUSE	() { clear(true); }
@@ -60,6 +60,15 @@ namespace pFROST {
 			copyLitsFrom(src);
 			assert(!_f);
 		}
+		SCLAUSE		(const SCLAUSE& src) {
+			_sz = src.size();
+			_lbd = src.lbd();
+			_sig = src.sig();
+			_st = src.status();
+			_f = (src.usage() << USAGE_OFF);
+			_lits = new uint32[_sz];
+			copyLitsFrom(src);
+		}
 		template <class SRC>
 		inline void		copyLitsFrom(const SRC& src) {
 			assert(_sz);
@@ -82,9 +91,9 @@ namespace pFROST {
 		inline uint32*	end			() { return _lits + _sz; }
 		inline uint32	back		() { return _lits[_sz - 1]; }
 		inline void		pop			() { _sz--; }
-		inline void		lock		() { _m.lock(); }
-		inline bool		tryLock		() { return _m.try_lock(); }
-		inline void		unlock		() { _m.unlock(); }
+		inline void		lock		() const { _m.lock(); }
+		inline bool		tryLock		() const { return _m.try_lock(); }
+		inline void		unlock		() const { _m.unlock(); }
 		inline void		markDeleted	() { _st = DELETED; }
 		inline void		markAdded	() { _f |= CADDED; }
 		inline void		melt		() { _f |= CMOLTEN; }
@@ -98,14 +107,14 @@ namespace pFROST {
 		inline CL_ST	status		() const { return _st; }
 		inline int		lbd			() const { return _lbd; }
 		inline int		size		() const { return _sz; }
-		inline uint64	sig			() { return _sig; }
-		inline int		hasZero		() {
+		inline uint64	sig			() const { return _sig; }
+		inline int		hasZero		() const {
 			for (int l = 0; l < size(); l++) {
 				if (_lits[l] == 0) return l;
 			}
 			return -1;
 		}
-		inline bool		isSorted	() {
+		inline bool		isSorted	() const {
 			for (int i = 0; i < size(); i++) {
 				if (i > 0 && _lits[i] < _lits[i - 1]) return false;
 			}
@@ -116,7 +125,7 @@ namespace pFROST {
 			for (int l = 0; l < this->size(); l++)
 				_sig |= MAPHASH(_lits[l]);
 		}
-		inline bool		has			(const uint32& lit) {
+		inline bool		has			(const uint32& lit) const {
 			if (size() == 2) {
 				if (_lits[0] == lit || _lits[1] == lit) return true;
 				else return false;
@@ -155,8 +164,8 @@ namespace pFROST {
 			printf(") %c:%d, used=%d, lbd=%d, s=0x%zX\n", st, molten(), usage(), _lbd, _sig);
 		}
 	};
-	typedef SCLAUSE* S_REF;
 
+	typedef SCLAUSE* S_REF;
 }
 
 #endif

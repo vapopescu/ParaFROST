@@ -28,6 +28,7 @@ BOOL_OPT opt_hse_en("hse", "enable hybrid subsumption elimination", true);
 BOOL_OPT opt_bce_en("bce", "enable blocked clause elimination", false);
 BOOL_OPT opt_ere_en("ere", "enable eager redundancy elimination", true);
 BOOL_OPT opt_igr_en("igr", "enable impication graph reasoning", true);
+BOOL_OPT opt_hbr_en("hbr", "enable hyper-binary-resolution", false);
 BOOL_OPT opt_hla_en("hla", "enable hidden literal addition", true);
 BOOL_OPT opt_ce_en("ce", "enable clause elimination stage", true);
 BOOL_OPT opt_all_en("all", "enable all simplifications", false);
@@ -187,6 +188,7 @@ void OPTION::init() {
 		profile_simp = opt_profile_simp_en;
 		ve_plus_en = opt_ve_plus_en;
 		hla_en = opt_hla_en && opt_igr_en;
+		hbr_en = opt_hbr_en;
 		bce_en = opt_bce_en;
 		ere_en = opt_ere_en;
 		all_en = opt_all_en;

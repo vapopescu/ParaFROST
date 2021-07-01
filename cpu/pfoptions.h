@@ -83,6 +83,7 @@ namespace pFROST {
 		bool	bce_en;
 		bool	ere_en;
 		bool	igr_en;
+		bool	hbr_en;
 		bool	hla_en;
 		bool	ce_en;
 		bool	all_en;
