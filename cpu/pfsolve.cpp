@@ -209,15 +209,19 @@ void ParaFROST::report()
 	if (opts.report_en) {
 		PFLOG0("");
 		PFLOG0("\t\t\tSimplifier Report");
-		if (!opts.profile_simp)
-			PFLOG1(" Simplifier time        : %-10.3f  sec", timer.simp);
-		else {
+		PFLOG1(" Simplifier time        : %-10.3f  sec", timer.simp);
+		if (opts.profile_simp) {
 			PFLOG1("  - Var ordering        : %-10.2f  ms", timer.vo);
 			PFLOG1("  - CNF compact         : %-10.2f  ms", timer.gc);
 			PFLOG1("  - OT  creation        : %-10.2f  ms", timer.cot);
 			PFLOG1("  - OT  sorting         : %-10.2f  ms", timer.sot);
 			PFLOG1("  - OT  reduction       : %-10.2f  ms", timer.rot);
+
 			PFLOG1("  - IGR                 : %-10.2f  ms", timer.igr);
+			for (int i = 0; i < IGR_COUNT; i++) {
+				PFLOG1("              part %-4d : %-10.2f  ms", i, timer.igr_part[i]);
+			}
+
 			PFLOG1("  - CE                  : %-10.2f  ms", timer.ce);
 			PFLOG1("  - BVE                 : %-10.2f  ms", timer.ve);
 			PFLOG1("  - HSE                 : %-10.2f  ms", timer.hse);

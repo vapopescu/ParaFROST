@@ -510,29 +510,16 @@ namespace pFROST {
 			inf.nClauses = inf.n_cls_after;
 		}
 		inline void		countAll			() {
-			std::atomic<uint32> batchIndex, batchSize;
 			std::atomic<uint32> c = 0, l = 0;
 
-			batchIndex = 0;
-			batchSize = (scnf.size() - 1) / workerPool.count() + 1;
-
-			workerPool.doWork([&] {
-				uint32 ct = 0, lt = 0;
-				uint32 begin = batchSize * batchIndex++;
-				uint32 end = std::min(begin + batchSize, (uint32) scnf.size());
-
-				for (uint32 i = begin; i < end; i++) {
-					if (scnf[i]->original() || scnf[i]->learnt()) {
-						ct++;
-						lt += scnf[i]->size();
-					}
+			workerPool.doWorkForEach((size_t)0, scnf.size(), [&](size_t i) {
+				if (scnf[i]->original() || scnf[i]->learnt()) {
+					c++;
+					l += scnf[i]->size();
 				}
-
-				c += ct;
-				l += lt;
 			});
-
 			workerPool.join();
+
 			inf.n_cls_after = c;
 			inf.n_lits_after = l;
 		}
@@ -608,8 +595,8 @@ namespace pFROST {
 					else occurs[ABS(lit)].ps++;
 				}
 			});
-
 			workerPool.join();
+
 			assert(occurs[0].ps == 0 && occurs[0].ns == 0);
 		}
 		inline void		removeClause		(S_REF& c) { assert(c != NULL); delete c; c = NULL; }
@@ -625,7 +612,7 @@ namespace pFROST {
 		void	bve					();
 		void	IGR					();
 		void	CE					();
-		void	VE					();
+		void	BVE					();
 		void	HSE					();
 		void	ERE					();
 		void	BCE					();

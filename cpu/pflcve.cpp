@@ -25,6 +25,7 @@ void ParaFROST::varReorder()
 {
 	PFLOGN2(2, " Finding eligible variables for LCVE..");
 	if (opts.profile_simp) timer.pstart();
+
 	eligible.resize(inf.maxVar);
 	occurs.resize(inf.maxVar + 1);
 	assert(!scnf.empty());
@@ -32,6 +33,7 @@ void ParaFROST::varReorder()
 	uint32* scores = sp->tmp_stack;
 	for (uint32 v = 1; v <= inf.maxVar; v++) eligible[v - 1] = v, scores[v] = rscore(v);
 	rSort(eligible, LCV_CMP(scores), LCV_RANK(scores));
+
 	if (opts.profile_simp) timer.pstop(), timer.vo += timer.pcpuTime();
 	PFLDONE(2, 5);
 	if (verbose >= 3) {

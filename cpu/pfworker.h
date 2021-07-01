@@ -125,5 +125,15 @@ namespace pFROST {
 			std::unique_lock<std::mutex> lock(_mutex);
 			_poolCV.wait(lock, [this] { return _jobQueue.empty() && _waiting == _workers.size(); });
 		}
+
+		inline int getID() const {
+			std::thread::id realId = std::this_thread::get_id();
+
+			for (int i = 0; i < _workers.size(); i++) {
+				if (realId == _workers[i].get_id()) return i;
+			}
+
+			return -1;
+		}
 	};
 }

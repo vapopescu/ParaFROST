@@ -101,19 +101,25 @@ void ParaFROST::IGR()
 		if (interrupted()) killSolver();
 		PFLOGN2(2, " Reasoning on the implication graph..");
 		if (opts.profile_simp) timer.pstart();
-		bool done = false;
 
 		workerPool.doWorkForEach((uint32)0, inf.nDualVars, [this](uint32 i) {
 			ig[i].clear(true);
 		});
 		workerPool.join();
 
+		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[0] += timer.pcpuTime();
+
+		bool done = false;
 		while (!done && cnfstate == UNSOLVED) {
+			if (opts.profile_simp) timer.pstart();
+
 			// Propagate boolean constraints
 			std::mutex propagateMutex;
 			if (sp->propagated < trail.size()) {
 				if (prop() < 0) break;
 			}
+
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[1] += timer.pcpuTime(), timer.pstart();
 
 			// Initialize IG based on original binary clauses.
 			workerPool.doWorkForEach((size_t)0, scnf.size(), [this](size_t i) {
@@ -133,7 +139,11 @@ void ParaFROST::IGR()
 			resetQueue.reserve(inf.nDualVars);
 			bool sccScan = true;
 
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[2] += timer.pcpuTime();
+
 			while (sccScan) {
+				if (opts.profile_simp) timer.pstart();
+
 				SCCWrapper wrapper;
 				wrapper.setNumThreads(opts.worker_count);
 				wrapper.setMethod(SCC_UFSCC);
@@ -149,6 +159,8 @@ void ParaFROST::IGR()
 					scc[FLIP(lit)] = FLIP(scc[lit]);
 				});
 				workerPool.join();
+
+				if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[3] += timer.pcpuTime(), timer.pstart();
 
 				// Replace each node with its SCC representative.
 				workerPool.doWorkForEach((uint32)1, inf.maxVar, [&](uint32 v) {
@@ -172,7 +184,11 @@ void ParaFROST::IGR()
 
 				delete[] scc;
 				if (!newEdge) sccScan = false;
+
+				if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[4] += timer.pcpuTime();
 			}
+
+			if (opts.profile_simp) timer.pstart();
 
 			// Reset SCC ancestor nodes.
 			std::mutex resetMutex;
@@ -230,6 +246,8 @@ void ParaFROST::IGR()
 			// Scan IG for exploration starting points.
 			uVec1D exploreQueue;
 
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[5] += timer.pcpuTime(), timer.pstart();
+
 			workerPool.doWorkForEach((uint32)2, inf.nDualVars, [&](uint32 lit) {
 				if (!ig[lit].isExplored()) {
 					bool explore = true;
@@ -269,16 +287,19 @@ void ParaFROST::IGR()
 			// Explore IG
 			std::mutex exploreMutex;
 			std::condition_variable exploreCV;
-			std::atomic<uint32> threadIdx = 0;
 			std::atomic<uint32> exploreIdx = 0;
 			std::atomic<bool> exploreTerminate = false;
 			std::vector<SCNF> newClauses(workerPool.count());
 			int exploreWorking = workerPool.count();
 			exploreQueue.reserve(inf.nDualVars);
 
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[6] += timer.pcpuTime(), timer.pstart();
+
 			workerPool.doWork([&] {
 				uint32 lit = 0;
-				uint32 ti = threadIdx++;
+				uint32 ti = workerPool.getID();
+				assert(ti >= 0);
+
 				while (true) {
 					if (lit == 0) {
 						std::unique_lock lock(exploreMutex);
@@ -594,6 +615,8 @@ void ParaFROST::IGR()
 			}
 			newClauses.clear();
 
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[7] += timer.pcpuTime();
+
 			// Exit condition
 			if (trail.size() == sp->propagated && exploreIdx == exploreQueue.size()) done = true;
 		}
@@ -630,7 +653,6 @@ void ParaFROST::IGR()
 		assert(ok);
 #endif
 
-		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime();
 		PFLDONE(2, 5);
 		//PFLOG2(2, " Number of SCCs in IG is %d.", (uint32)sccCount);
 		PFLREDALL(this, 2, "IGR Reductions");
@@ -647,36 +669,36 @@ void ParaFROST::CE()
 		workerPool.doWorkForEach((size_t)0, scnf.size(), (size_t)64, [this](size_t i) {
 			clause_elim(scnf[i], ot, ig);
 		});
-
 		workerPool.join();
+
 		if (opts.profile_simp) timer.pstop(), timer.ce += timer.pcpuTime();
 		PFLDONE(2, 5);
 		PFLREDALL(this, 2, "Clause Reductions");
 	}
 }
 
-void ParaFROST::bve()
+void ParaFROST::BVE()
 {
-	if (interrupted()) killSolver();
-	if (opts.profile_simp) timer.pstart();
-	std::atomic<uint32> ti = 0;
-	std::vector<uVec1D> resolved(PVs.size());
-	std::vector<SCNF> new_res(PVs.size());
+	if (opts.ve_en) {
+		if (interrupted()) killSolver();
+		PFLOGN2(2, "  Eliminating variables..");
+		if (opts.profile_simp) timer.pstart();
 
-	workerPool.doWork([&] {
-		Lits_t out_c;
-		out_c.reserve(INIT_CAP);
+		std::vector<uVec1D> resolved(PVs.size());
+		std::vector<SCNF> new_res(PVs.size());
 
-		while (true) {
-			uint32 i = ti++;
-			if (i >= PVs.size()) break;
+		workerPool.doWorkForEach((uint32)0, PVs.size(), (uint32)1, [&](uint32 i) {
 			uint32 v = PVs[i];
 			assert(v);
 			assert(sp->vstate[v] == ACTIVE);
+
+			Lits_t out_c;
+			out_c.reserve(INIT_CAP);
 			uint32 p = V2L(v), n = NEG(p);
 			OL& poss = ot[p], & negs = ot[n];
 			int pOrgs = 0, nOrgs = 0;
 			countOrgs(poss, pOrgs), countOrgs(negs, nOrgs);
+
 			// pure-literal
 			if (!pOrgs || !nOrgs) {
 				toblivion(p, pOrgs, nOrgs, poss, negs, resolved[i]);
@@ -722,46 +744,38 @@ void ParaFROST::bve()
 					sp->vstate[v] = MELTED, v = 0;
 				}
 			}
-		}
-	});
+		});
+		workerPool.join();
 
-	workerPool.join();
-	uint32 resLit = 0;
-	for (uint32 i = 0; i < PVs.size(); i++) {
-		resLit += resolved[i].size();
-	}
-
-	uint32 resNum = 0;
-	for (uint32 i = 0; i < PVs.size(); i++) {
-		resNum += new_res[i].size();
-	}
-
-	model.resolved.reserve(model.resolved.size() + resLit + 1);
-	for (uint32 i = 0; i < PVs.size(); i++) {
-		for (int j = 0; j < resolved[i].size(); j++) {
-			model.resolved.push(resolved[i][j]);
-		}
-		model.resolved.push(resLit);
-
-		for (int j = 0; j < new_res[i].size(); j++) {
-			S_REF c = new_res[i][j];
-			newResolvent(c);
+		uint32 resLit = 0;
+		for (uint32 i = 0; i < PVs.size(); i++) {
+			resLit += resolved[i].size();
 		}
 
-		resolved[i].clear(true);
-		new_res[i].clear(true);
-	}
+		uint32 resNum = 0;
+		for (uint32 i = 0; i < PVs.size(); i++) {
+			resNum += new_res[i].size();
+		}
 
-	if (opts.profile_simp) timer.pstop(), timer.ve += timer.pcpuTime();
-}
+		model.resolved.reserve(model.resolved.size() + resLit + 1);
+		for (uint32 i = 0; i < PVs.size(); i++) {
+			for (int j = 0; j < resolved[i].size(); j++) {
+				model.resolved.push(resolved[i][j]);
+			}
+			model.resolved.push(resLit);
 
-void ParaFROST::VE()
-{
-	if (opts.ve_en) {
-		PFLOGN2(2, "  Eliminating variables..");
-		bve();
+			for (int j = 0; j < new_res[i].size(); j++) {
+				S_REF c = new_res[i][j];
+				newResolvent(c);
+			}
+
+			resolved[i].clear(true);
+			new_res[i].clear(true);
+		}
+
+		if (opts.profile_simp) timer.pstop(), timer.ve += timer.pcpuTime();
 		PFLDONE(2, 5);
-		PFLREDALL(this, 2, "VE Reductions");
+		PFLREDALL(this, 2, "BVE Reductions");
 	}
 }
 
@@ -771,22 +785,17 @@ void ParaFROST::HSE()
 		if (interrupted()) killSolver();
 		PFLOGN2(2, "  Eliminating (self)-subsumptions..");
 		if (opts.profile_simp) timer.pstart();
-		std::atomic<uint32> ti = 0;
 
-		workerPool.doWork([&] {
-			while (true) {
-				uint32 i = ti++;
-				if (i >= PVs.size()) break;
-				uint32 v = PVs[i];
-				assert(v);
-				assert(sp->vstate[v] == ACTIVE);
-				uint32 p = V2L(v), n = NEG(p);
-				if (ot[p].size() <= opts.hse_limit && ot[n].size() <= opts.hse_limit)
-					self_sub_x(p, ot[p], ot[n]);
-			}
+		workerPool.doWorkForEach((uint32)0, PVs.size(), (uint32)1, [&](uint32 i) {
+			uint32 v = PVs[i];
+			assert(v);
+			assert(sp->vstate[v] == ACTIVE);
+			uint32 p = V2L(v), n = NEG(p);
+			if (ot[p].size() <= opts.hse_limit && ot[n].size() <= opts.hse_limit)
+				self_sub_x(p, ot[p], ot[n]);
 		});
-
 		workerPool.join();
+
 		if (opts.profile_simp) timer.pstop(), timer.hse += timer.pcpuTime();
 		PFLDONE(2, 5);
 		PFLREDALL(this, 2, "HSE Reductions");
@@ -799,21 +808,16 @@ void ParaFROST::BCE()
 		if (interrupted()) killSolver();
 		PFLOGN2(2, " Eliminating blocked clauses..");
 		if (opts.profile_simp) timer.pstart();
-		std::atomic<uint32> ti = 0;
 
-		workerPool.doWork([&] {
-			while (true) {
-				uint32 i = ti++;
-				if (i >= PVs.size()) break;
-				uint32 v = PVs[i];
-				if (!v) continue;
-				uint32 p = V2L(v), n = NEG(p);
-				if (ot[p].size() <= opts.bce_limit && ot[n].size() <= opts.bce_limit)
-					blocked_x(v, ot[n], ot[p]);
-			}
+		workerPool.doWorkForEach((uint32)0, PVs.size(), (uint32)1, [&](uint32 i) {
+			uint32 v = PVs[i];
+			if (!v) return;
+			uint32 p = V2L(v), n = NEG(p);
+			if (ot[p].size() <= opts.bce_limit && ot[n].size() <= opts.bce_limit)
+				blocked_x(v, ot[n], ot[p]);
 		});
-
 		workerPool.join();
+
 		if (opts.profile_simp) timer.pstop(), timer.bce += timer.pcpuTime();
 		PFLDONE(2, 5);
 		PFLREDALL(this, 2, "BCE Reductions");
@@ -826,38 +830,33 @@ void ParaFROST::ERE()
 	if (interrupted()) killSolver();
 	PFLOGN2(2, " Eliminating redundances..");
 	if (opts.profile_simp) timer.pstart();
-	std::atomic<uint32> ti = 0;
 
-	workerPool.doWork([&] {
+	workerPool.doWorkForEach((uint32)0, PVs.size(), (uint32)1, [&](uint32 i) {
+		uint32 v = PVs[i];
+		assert(v);
+		uint32 p = V2L(v);
+		OL& poss = ot[p], & negs = ot[NEG(p)];
 		Lits_t m_c;
 		m_c.reserve(INIT_CAP);
 
-		while (true) {
-			uint32 i = ti++;
-			if (i >= PVs.size()) break;
-			assert(PVs[i]);
-			uint32 p = V2L(PVs[i]);
-			OL& poss = ot[p], & negs = ot[NEG(p)];
-
-			if (ot[p].size() <= opts.ere_limit && ot[NEG(p)].size() <= opts.ere_limit) {
-				// do merging and apply forward equality check (on-the-fly) over resolvents
-				for (int i = 0; i < poss.size(); i++) {
-					if (poss[i]->deleted()) continue;
-					for (int j = 0; j < negs.size(); j++) {
-						if (negs[j]->deleted() || (poss[i]->size() + negs[j]->size() - 2) > MAX_ERE_OUT) continue;
-						if (merge_ere(PVs[i], poss[i], negs[j], m_c)) {
-							CL_ST type;
-							if (poss[i]->learnt() || negs[j]->learnt()) type = LEARNT;
-							else type = ORIGINAL;
-							if (m_c.size() > 1) forward_equ(m_c, ot, type);
-						}
+		if (ot[p].size() <= opts.ere_limit && ot[NEG(p)].size() <= opts.ere_limit) {
+			// do merging and apply forward equality check (on-the-fly) over resolvents
+			for (int i = 0; i < poss.size(); i++) {
+				if (poss[i]->deleted()) continue;
+				for (int j = 0; j < negs.size(); j++) {
+					if (negs[j]->deleted() || (poss[i]->size() + negs[j]->size() - 2) > MAX_ERE_OUT) continue;
+					if (merge_ere(PVs[i], poss[i], negs[j], m_c)) {
+						CL_ST type;
+						if (poss[i]->learnt() || negs[j]->learnt()) type = LEARNT;
+						else type = ORIGINAL;
+						if (m_c.size() > 1) forward_equ(m_c, ot, type);
 					}
 				}
 			}
 		}
 	});
-
 	workerPool.join();
+
 	if (opts.profile_simp) timer.pstop(), timer.ere += timer.pcpuTime();
 	PFLDONE(2, 5);
 	PFLREDCL(this, 2, "ERE Reductions");

@@ -68,11 +68,14 @@ void ParaFROST::reduceOL(OL& ol)
 void ParaFROST::reduceOT()
 {
 	if (opts.profile_simp) timer.pstart();
-	for (uint32 v = 1; v <= inf.maxVar; v++) {
+
+	workerPool.doWorkForEach((uint32)1, inf.maxVar, [&](uint32 v) {
 		uint32 p = V2L(v), n = NEG(p);
 		reduceOL(ot[p]);
 		reduceOL(ot[n]);
-	}
+	});
+	workerPool.join();
+
 	if (opts.profile_simp) timer.pstop(), timer.rot += timer.pcpuTime();
 }
 
@@ -158,8 +161,7 @@ void ParaFROST::sigmify()
 	/********************************/
 	/*         awaken sigma         */
 	/********************************/
-	timer.stop(), timer.solve += timer.cpuTime();
-	if (!opts.profile_simp) timer.start();
+	timer.stop(), timer.solve += timer.cpuTime(), timer.start();
 	awaken();
 	if (cnfstate == UNSAT || sigState == AWAKEN_FAIL) return;
 	if (sigState == SALLOC_FAIL) return;
@@ -190,7 +192,7 @@ void ParaFROST::sigmify()
 			if (!LCVE()) break;
 			sortOT(true);
 			if (stop(diff)) { ERE(); break; }
-			HSE(), VE(), BCE();
+			HSE(), BVE(), BCE();
 
 			// Cleanup
 			countAll(), filterPVs();
@@ -219,21 +221,40 @@ void ParaFROST::sigmify()
 			sigmaDelay();
 		}
 	}
-	if (!opts.profile_simp) timer.stop(), timer.simp += timer.cpuTime();
+
+	timer.stop(), timer.simp += timer.cpuTime();
 	if (!opts.solve_en) killSolver();
 	timer.start();
 }
 
 void ParaFROST::shrinkSimp() {
-	if (opts.profile_simp) timer.start();
-	uint32 n = 0;
-	for (uint32 i = 0; i < scnf.size(); i++) {
+	if (opts.profile_simp) timer.pstart();
+
+	std::vector<SCNF> partialSCNF(workerPool.count());
+	for (uint32 i = 0; i < partialSCNF.size(); i++) {
+		partialSCNF[i].reserve(scnf.size() * 2 / workerPool.count());
+	}
+
+	workerPool.doWorkForEach((size_t)0, scnf.size(), [&](size_t i) {
 		S_REF c = scnf[i];
+		uint32 ti = workerPool.getID();
+		assert(ti >= 0);
+
 		if (c->deleted()) removeClause(c);
-		else scnf[n++] = c;
+		else partialSCNF[ti].push(c);
+	});
+	workerPool.join();
+
+	uint32 n = 0;
+	for (uint32 i = 0; i < partialSCNF.size(); i++) {
+		for (uint32 j = 0; j < partialSCNF[i].size(); j++) {
+			scnf[n++] = partialSCNF[i][j];
+		}
+		partialSCNF[i].clear(true);
 	}
 	scnf.resize(n);
-	if (opts.profile_simp) timer.stop(), timer.gc += timer.cpuTime();
+
+	if (opts.profile_simp) timer.pstop(), timer.gc += timer.pcpuTime();
 }
 
 void ParaFROST::newBeginning() {
