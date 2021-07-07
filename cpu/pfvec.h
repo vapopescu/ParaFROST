@@ -190,13 +190,14 @@ namespace pFROST {
 			S end = size();
 			S idx = (end - begin) / 2;
 
-			while (end - begin > 1 && _mem[idx] != item) {
+			while (end != begin) {
+				if (_mem[idx] == item) return true;
 				if (less(item, _mem[idx])) end = idx;
 				else begin = idx + 1;
 				idx = begin + (end - begin) / 2;
 			}
 
-			return _mem[idx] == item;
+			return false;
 		}
 	};
 	// vector types

@@ -45,6 +45,8 @@ INT_OPT opt_bce_max_occurs("bcemax", "maximum occurrence list size to scan in BC
 INT_OPT opt_ere_max_occurs("eremax", "maximum occurrence list size to scan in ERE", 30000, INT32R(100, INT32_MAX));
 INT_OPT opt_phases("phases", "set the number of phases in stage1 reductions", 5, INT32R(0, INT32_MAX));
 INT_OPT opt_cnf_free("gcfreq", "set the frequency of CNF memory shrinkage in SIGmA", 2, INT32R(0, 5));
+INT_OPT	opt_hbr_max("hbrmax", "set the maximum number of retries for hyper-binary-resolution", 10, INT32R(0, INT32_MAX));
+INT_OPT	opt_rse_max("rsemax", "set the maximum number of literals for a clause to be considered for reverse subsumption elimination", 10, INT32R(0, INT32_MAX));
 
 // solver options
 BOOL_OPT opt_sig_pre_en("sigma", "enable preprocessing using SIGmA", false);
@@ -202,6 +204,8 @@ void OPTION::init() {
 		bce_limit = opt_bce_max_occurs;
 		ere_limit = opt_ere_max_occurs;
 		xor_max_arity = opt_xor_max_arity;
+		hbr_max = opt_hbr_max;
+		rse_max = opt_rse_max;
 		igr_en = opt_igr_en;
 		ce_en = opt_ce_en;
 		ve_en = opt_ve_en || ve_plus_en;

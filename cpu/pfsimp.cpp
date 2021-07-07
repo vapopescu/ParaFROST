@@ -163,9 +163,7 @@ void ParaFROST::sigmify()
 	/********************************/
 	timer.stop(), timer.solve += timer.cpuTime(), timer.start();
 	awaken();
-	if (cnfstate == UNSAT || sigState == AWAKEN_FAIL) return;
-	if (sigState == SALLOC_FAIL) return;
-	if (!interrupted()) {
+	if (!(cnfstate == UNSAT || sigState == AWAKEN_FAIL || sigState == SALLOC_FAIL) && !interrupted()) {
 		int64 before, diff;
 		/********************************/
 		/*      V/C Eliminations        */
@@ -182,7 +180,7 @@ void ParaFROST::sigmify()
 
 			// Stage 2
 			IGR();
-			if (cnfstate == UNSAT) return;
+			if (cnfstate == UNSAT) break;
 
 			// Stage 3
 			sortOT(false);
@@ -204,21 +202,23 @@ void ParaFROST::sigmify()
 		/********************************/
 		/*          Write Back          */
 		/********************************/
-		assert(sp->propagated == trail.size());
-		if (interrupted()) killSolver();
-		occurs.clear(true), ot.clear(true);
-		countFinal();
-		shrinkSimp(), assert(inf.nClauses == scnf.size());
-		stats.sigmifications++;
-		lrn.elim_lastmarked = lrn.elim_marked;
-		if (opts.aggr_cnf_sort) std::stable_sort(scnf.data(), scnf.data() + scnf.size(), CNF_CMP_KEY());
-		if (inf.maxFrozen > sp->simplified) stats.n_forced += inf.maxFrozen - sp->simplified;
-		if (satisfied() || !inf.nClauses)
-			cnfstate = SAT, printStats(1, 'p', CGREEN);
-		else {
-			if (maxInactive() > opts.map_min) map(true);
-			else assert(!mapped), newBeginning();
-			sigmaDelay();
+		if (cnfstate != UNSAT) {
+			assert(sp->propagated == trail.size());
+			if (interrupted()) killSolver();
+			occurs.clear(true), ot.clear(true);
+			countFinal();
+			shrinkSimp(), assert(inf.nClauses == scnf.size());
+			stats.sigmifications++;
+			lrn.elim_lastmarked = lrn.elim_marked;
+			if (opts.aggr_cnf_sort) std::stable_sort(scnf.data(), scnf.data() + scnf.size(), CNF_CMP_KEY());
+			if (inf.maxFrozen > sp->simplified) stats.n_forced += inf.maxFrozen - sp->simplified;
+			if (satisfied() || !inf.nClauses)
+				cnfstate = SAT, printStats(1, 'p', CGREEN);
+			else {
+				if (maxInactive() > opts.map_min) map(true);
+				else assert(!mapped), newBeginning();
+				sigmaDelay();
+			}
 		}
 	}
 

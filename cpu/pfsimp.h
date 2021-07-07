@@ -923,10 +923,8 @@ namespace SIGmA {
 
 	inline void clause_elim(S_REF& c, OT& ot, IG& ig)
 	{
-		if (c->size() <= 2) return;
-
-		// FSE
-		if (pfrost->opts.hse_en && !c->deleted() && c->size() <= HSE_MAX_CL_SIZE) {
+		// RSE
+		if (pfrost->opts.hse_en && !c->deleted() && c->size() <= pfrost->opts.rse_max) {
 			CNF_CMP_ABS less;
 			OL subsumed;
 
@@ -996,7 +994,7 @@ namespace SIGmA {
 		}
 
 		// BCE
-		if (pfrost->opts.bce_en && !c->deleted() && !c->learnt()) {
+		if (pfrost->opts.bce_en && !c->deleted() && !c->learnt() && c->size() > 2) {
 			for (int k = 0; k < c->size() && !c->deleted(); k++) {
 				OL& ol = ot[FLIP(c->lit(k))];
 				if (ol.size() <= pfrost->opts.bce_limit && is_blocked_x(ABS(c->lit(k)), c, ol))
@@ -1093,6 +1091,26 @@ namespace SIGmA {
 		}
 		else ig[oldLit].unlockRead();
 		return newEdge;
+	}
+
+	inline void add_binary_clause(const uint32& l1, const uint32& l2, SCNF& cnf, Lits_t& out_c)
+	{
+		assert(l1 > 1);
+		assert(l2 > 1);
+		out_c.clear();
+
+		if (l1 < l2) {
+			out_c.push(l1);
+			out_c.push(l2);
+		}
+		else {
+			out_c.push(l2);
+			out_c.push(l1);
+		}
+
+		cnf.lock();
+		cnf.push(new SCLAUSE(out_c));
+		cnf.unlock();
 	}
 
 }

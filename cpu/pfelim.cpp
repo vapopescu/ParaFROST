@@ -31,19 +31,21 @@ int ParaFROST::prop()
 
 	workerPool.doWork([&] {
 		uint32 assign = 0;
-		while (true) {
+		while (cnfstate == UNSOLVED) {
 			{
 				std::unique_lock<std::mutex> lock(m);
-				std::function<bool()> condition = [&] { return sp->propagated < trail.size() || cnfstate == UNSAT || working == 0; };
-				if (!condition()) {
-					working--;
+				working--;
 
-					if (working == 0) cv.notify_all();
-					else cv.wait(lock, condition);
-
-					if (sp->propagated == trail.size() || cnfstate == UNSAT) break;
-					working++;
+				while (sp->propagated == trail.size()) {
+					if (working == 0 || cnfstate == UNSAT) {
+						cv.notify_all(); 
+						return;
+					}
+					else cv.wait(lock);
 				}
+
+				if (cnfstate == UNSAT) break;
+				working++;
 				assign = trail[sp->propagated++];
 			}
 
@@ -110,6 +112,7 @@ void ParaFROST::IGR()
 		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[0] += timer.pcpuTime();
 
 		bool done = false;
+		int hbrRetries = opts.hbr_max;
 		while (!done && cnfstate == UNSOLVED) {
 			if (opts.profile_simp) timer.pstart();
 
@@ -137,6 +140,9 @@ void ParaFROST::IGR()
 			// SCC equivalence reduction
 			uVec1D resetQueue;
 			resetQueue.reserve(inf.nDualVars);
+			SCCWrapper* sccWrapper = new SCCWrapper();
+			sccWrapper->setNumThreads(opts.worker_count);
+			sccWrapper->setMethod(SCC_UFSCC);
 			bool sccScan = true;
 
 			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[2] += timer.pcpuTime();
@@ -144,13 +150,9 @@ void ParaFROST::IGR()
 			while (sccScan) {
 				if (opts.profile_simp) timer.pstart();
 
-				SCCWrapper wrapper;
-				wrapper.setNumThreads(opts.worker_count);
-				wrapper.setMethod(SCC_UFSCC);
-				wrapper.setGraph(ig);
-
 				// Compute SCC for each node.
-				node_t* scc = wrapper.getSCC();
+				sccWrapper->setGraph(ig);
+				node_t* scc = sccWrapper->getSCC();
 				std::atomic<uint32> sccCount = 0;
 				std::atomic<bool> newEdge = false;
 
@@ -191,6 +193,7 @@ void ParaFROST::IGR()
 			if (opts.profile_simp) timer.pstart();
 
 			// Reset SCC ancestor nodes.
+			delete sccWrapper;
 			std::mutex resetMutex;
 			std::condition_variable resetCV;
 			std::atomic<uint32> resetIdx = 0;
@@ -201,16 +204,17 @@ void ParaFROST::IGR()
 				while (true) {
 					if (lit == 0) {
 						std::unique_lock lock(resetMutex);
-						std::function<bool()> condition = [&] { return resetIdx < resetQueue.size() || resetWorking == 0; };
-						if (!condition()) {
-							resetWorking--;
+						resetWorking--;
 
-							if (resetWorking == 0) resetCV.notify_all();
-							else resetCV.wait(lock, condition);
-
-							if (resetIdx == resetQueue.size()) break;
-							resetWorking++;
+						while (resetIdx == resetQueue.size()) {
+							if (resetWorking == 0) {
+								resetCV.notify_all();
+								return;
+							}
+							else resetCV.wait(lock);
 						}
+
+						resetWorking++;
 						lit = resetQueue[resetIdx++];
 					}
 
@@ -300,19 +304,22 @@ void ParaFROST::IGR()
 				uint32 ti = workerPool.getID();
 				assert(ti >= 0);
 
-				while (true) {
+				while (cnfstate == UNSOLVED || !exploreTerminate) {
 					if (lit == 0) {
 						std::unique_lock lock(exploreMutex);
-						std::function<bool()> condition = [&] { return exploreIdx < exploreQueue.size() || exploreWorking == 0 || cnfstate == UNSAT || exploreTerminate; };
-						if (!condition()) {
-							exploreWorking--;
+						exploreWorking--;
 
-							if (exploreWorking == 0) exploreCV.notify_all();
-							else exploreCV.wait(lock, condition);
-
-							if (exploreIdx == exploreQueue.size() || cnfstate == UNSAT || exploreTerminate) break;
-							exploreWorking++;
+						while (exploreIdx == exploreQueue.size()) {
+							if (exploreWorking == 0 || cnfstate == UNSAT || exploreTerminate) {
+								exploreTerminate = true;
+								exploreCV.notify_all();
+								break;
+							}
+							else exploreCV.wait(lock);
 						}
+
+						if (exploreTerminate) break;
+						exploreWorking++;
 						lit = exploreQueue[exploreIdx++];
 					}
 
@@ -332,11 +339,7 @@ void ParaFROST::IGR()
 					}
 
 					// Early return. Nothing left to do.
-					if (ig[lit].isExplored()) {
-						ig[lit].unlockRead();
-						lit = 0;
-						continue;
-					}
+					if (ig[lit].isExplored()) { ig[lit].unlockRead(); lit = 0; continue; }
 
 					// Check if all children are explored.
 					bool childrenExplored = true;
@@ -355,10 +358,7 @@ void ParaFROST::IGR()
 					ig[lit].unlockRead();
 
 					// Cannot procede if not all children are explored.
-					if (!childrenExplored) {
-						lit = 0;
-						continue;
-					}
+					if (!childrenExplored) { lit = 0; continue; }
 
 					ig[lit].lock();
 					for (uint32 i = 0; i < cs.size(); i++) {
@@ -424,26 +424,25 @@ void ParaFROST::IGR()
 							}
 
 							if (unassigned(flipLit)) enqueueOrg(flipLit);
-							else { cnfstate = UNSAT; exploreCV.notify_all(); break; }
+							else { cnfstate = UNSAT; exploreCV.notify_all(); }
 
 							propagateMutex.unlock();
 							ig[flipLit].unlockRead();
+
 							failed = true;
 							break;
 						}
 					}
 
-					if (failed) {
-						lit = 0;
-						continue;
-					}
+					if (failed) { lit = 0; continue; }
 
 					// Hyper-Binary-Resolution
-					if (opts.hbr_en) {
-						bool resetLit = false;
+					if (opts.hbr_en && hbrRetries > 0) {
+						ig[lit].unlock();
 
 						// Compute transitive closure
-						uVec1D transClosure;
+						uVec1D transClosure = uVec1D();
+						ig[lit].lockRead();
 						transClosure.reserve(cs.size() + ds.size() + 1);
 						for (uint32 i = 0; i < cs.size(); i++) {
 							if (!cs[i].second->deleted()) {
@@ -452,12 +451,13 @@ void ParaFROST::IGR()
 						}
 						transClosure.unionize(ds);
 						transClosure.unionize(uVec1D({ lit }));
+						ig[lit].unlockRead();
 
 						// Compute propagation closure
 						uVec1D propClosure;
 						uVec1D propQueue;
 						uint32 propIdx = 0;
-						propClosure.reserve(transClosure.size());
+						propClosure.copyFrom(transClosure);
 						propQueue.copyFrom(transClosure);
 
 						std::function<bool(S_REF, S_REF)> srefLess = [](const S_REF& lhs, const S_REF& rhs) { return (long long)lhs < (long long)rhs; };
@@ -468,24 +468,38 @@ void ParaFROST::IGR()
 							uint32 f_assign = FLIP(assign);
 							assert(assign > 1);
 
-							if (!propClosure.contains(assign)) {
-								// reduce unsatisfied
-								for (uint32 i = 0; i < ot[f_assign].size(); i++) {
-									S_REF& c = ot[f_assign][i];
-									int unitIdx = -1;
+							// reduce unsatisfied
+							for (uint32 i = 0; i < ot[f_assign].size(); i++) {
+								S_REF& c = ot[f_assign][i];
+								int unitIdx = -1;
 
-									for (uint32 k = 0; k < c->size(); k++) {
-										if (propClosure.contains(c->lit(k))) { unitIdx = -1; break; }
-										else if (!propClosure.contains(FLIP(c->lit(k)))) { 
-											if (unitIdx == -1) unitIdx = k; 
-											else { unitIdx = -1; break; };
-										}
+								for (uint32 k = 0; k < c->size(); k++) {
+									if (propClosure.contains(c->lit(k))) { unitIdx = -1; break; }
+									else if (!propClosure.contains(FLIP(c->lit(k)))) { 
+										if (unitIdx == -1) unitIdx = k; 
+										else { unitIdx = -1; break; };
 									}
-
-									if (unitIdx >= 0) propQueue.push(c->lit(unitIdx));
 								}
 
-								propClosure.unionize(uVec1D({ assign }));
+								if (unitIdx >= 0) {
+									uint32 unitLit = c->lit(unitIdx);
+									assert(unitLit > 1);
+
+									if (!propClosure.contains(FLIP(unitLit))) {
+										propQueue.push(unitLit);
+										propClosure.unionize(uVec1D({ unitLit }));
+									}
+									else {
+										// conflict => failed literal
+										propagateMutex.lock();
+										if (unassigned(flipLit)) enqueueOrg(flipLit);
+										else { cnfstate = UNSAT; exploreCV.notify_all(); break; }
+										propagateMutex.unlock();
+										break;
+									}
+								}
+
+								if (exploreTerminate) break;
 							}
 
 							//// remove satisfied
@@ -508,6 +522,7 @@ void ParaFROST::IGR()
 							//		if (unassigned(flipLit)) enqueueOrg(flipLit);
 							//		else { cnfstate = UNSAT; exploreCV.notify_all(); break; }
 							//		propagateMutex.unlock();
+							//		break;
 							//	}
 							//	else if (proxyMap[c].size() == 1) {
 							//		uint32 propLit = *proxyMap[c];
@@ -518,67 +533,38 @@ void ParaFROST::IGR()
 							//		}
 							//	}
 							//}
-
 						}
 
 						proxyMap.clear();
-						if (cnfstate == UNSAT) {
-							ig[lit].unlock();
-							lit = 0;
-							continue;
-						}
+						if (exploreTerminate || cnfstate == UNSAT) { lit = 0; continue; }
 
 						// Compare the closures
 						uint32 i = 0, j = 0;
+						Lits_t out_c; out_c.reserve(2);
+
 						while (i < propClosure.size() && j < transClosure.size()) {
 							if (propClosure[i] == transClosure[j]) { i++; j++; }
 							else if (propClosure[i] < transClosure[j]) {
-								// new binary clause
-								Lits_t c;
-								c.reserve(2);
-
-								if (flipLit < propClosure[i]) {
-									c.push(flipLit);
-									c.push(propClosure[i]);
-								}
-								else {
-									c.push(propClosure[i]);
-									c.push(flipLit);
-								}
-
-								newClauses[ti].push(new SCLAUSE(c));
-								resetLit = true;
+								add_binary_clause(propClosure[i], flipLit, newClauses[ti], out_c);
+								failed = true;
 								i++;
 							}
 							else { assert(false); j++; }
 						}
 
 						while (i < propClosure.size()) {
-							// new binary clause
-							Lits_t c;
-							c.reserve(2);
-
-							if (flipLit < propClosure[i]) {
-								c.push(flipLit);
-								c.push(propClosure[i]);
-							}
-							else {
-								c.push(propClosure[i]);
-								c.push(flipLit);
-							}
-
-							newClauses[ti].push(new SCLAUSE(c));
-							resetLit = true;
+							add_binary_clause(propClosure[i], flipLit, newClauses[ti], out_c);
+							failed = true;
 							i++;
 						}
 
-						if (resetLit) {
-							ig[lit].unlock();
-							lit = 0;
+						if (failed) { 
 							exploreTerminate = true;
 							exploreCV.notify_all();
 							break;
 						}
+
+						ig[lit].lock();
 					}
 
 					// Queue parents for exploration.
@@ -604,8 +590,10 @@ void ParaFROST::IGR()
 			workerPool.join();
 
 			// Add new clauses to CNF
+			bool clausesAdded = false;
 			for (uint32 i = 0; i < newClauses.size(); i++) {
 				for (uint32 j = 0; j < newClauses[i].size(); j++) {
+					clausesAdded = true;
 					S_REF& c = newClauses[i][j];
 					newResolvent(c);
 					ot[c->lit(0)].push(c);
@@ -613,12 +601,12 @@ void ParaFROST::IGR()
 				}
 				newClauses[i].clear(true);
 			}
-			newClauses.clear();
+			if (clausesAdded) hbrRetries--;
 
 			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[7] += timer.pcpuTime();
 
 			// Exit condition
-			if (trail.size() == sp->propagated && exploreIdx == exploreQueue.size()) done = true;
+			if (trail.size() == sp->propagated && exploreIdx == exploreQueue.size() && !clausesAdded) done = true;
 		}
 
 		// Sanity check.
