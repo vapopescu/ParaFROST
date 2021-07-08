@@ -60,7 +60,7 @@ using std::ostream;
 using std::fstream;
 using std::ifstream;
 
-#define IGR_COUNT 9
+#define IGR_COUNT 10
 
 namespace pFROST {
 

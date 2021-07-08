@@ -452,7 +452,7 @@ void ParaFROST::IGR()
 						}
 					}
 
-					if (failed) { lit = 0; continue; }
+					if (failed) { exploreTerminate = true; exploreCV.notify_all(); break; }
 
 					// Hyper-Binary-Resolution
 					if (opts.hbr_en && hbrRetries > 0) {
@@ -576,11 +576,7 @@ void ParaFROST::IGR()
 							i++;
 						}
 
-						if (failed) { 
-							exploreTerminate = true;
-							exploreCV.notify_all();
-							break;
-						}
+						if (failed) { exploreTerminate = true; exploreCV.notify_all(); break; }
 
 						ig[lit].lock();
 					}
