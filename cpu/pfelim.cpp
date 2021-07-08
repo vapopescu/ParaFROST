@@ -130,6 +130,10 @@ void ParaFROST::IGR()
 		});
 		workerPool.join();
 
+		SCCWrapper sccWrapper;
+		sccWrapper.setNumThreads(opts.worker_count);
+		sccWrapper.setMethod(SCC_UFSCC);
+		sccWrapper.setGraph(ig);
 		bool done = false;
 		int hbrRetries = opts.hbr_max;
 
@@ -158,9 +162,6 @@ void ParaFROST::IGR()
 			// SCC equivalence reduction
 			uVec1D resetQueue;
 			resetQueue.reserve(inf.nDualVars);
-			SCCWrapper* sccWrapper = new SCCWrapper();
-			sccWrapper->setNumThreads(opts.worker_count);
-			sccWrapper->setMethod(SCC_UFSCC);
 			bool sccScan = true;
 
 			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[4] += timer.pcpuTime();
@@ -169,8 +170,8 @@ void ParaFROST::IGR()
 				if (opts.profile_simp) timer.pstart();
 
 				// Compute SCC for each node.
-				sccWrapper->setGraph(ig);
-				node_t* scc = sccWrapper->getSCC();
+				sccWrapper.updateGraph();
+				node_t* scc = sccWrapper.getSCC();
 				std::atomic<uint32> sccCount = 0;
 				std::atomic<bool> newEdge = false;
 
@@ -211,7 +212,6 @@ void ParaFROST::IGR()
 			if (opts.profile_simp) timer.pstart();
 
 			// Reset SCC ancestor nodes.
-			delete sccWrapper;
 			std::mutex resetMutex;
 			std::condition_variable resetCV;
 			std::atomic<uint32> resetIdx = 0;

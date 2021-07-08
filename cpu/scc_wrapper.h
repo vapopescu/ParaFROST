@@ -61,25 +61,7 @@ namespace pFROST {
 		inline void setNumThreads(const unsigned int& num_threads) { this->num_threads = num_threads; }
 		inline void setMethod(const unsigned int& method) { this->method = method; }
 		inline void setGraph(const IG& ig) { G.set_graph(ig); }
-
-		inline void freezeGraph(const IG& ig) {
-			G.clear_graph();
-
-			for (uint32 i = 0; i < inf.nDualVars; i++) {
-				G.add_node();
-			}
-
-			pfrost->workerPool.doWorkForEach((uint32)0, inf.nDualVars, [&](uint32 i) {
-				for (uint32 j = 0; j < ig[i].children().size(); j++) {
-					if (!ig[i].children()[j].second->deleted()) {
-						G.add_edge(i, ig[i].children()[j].first);
-					}
-				}
-			});
-			pfrost->workerPool.join();
-
-			G.freeze();
-		}
+		inline void updateGraph() { G.update_graph(); }
 
 		inline node_t* getSCC() {
 			// Initialize

@@ -28,10 +28,38 @@ namespace pFROST {
     protected:
         const IG* _ig;
 
-	public:
+        inline node_t add_node() {
+            if (_frozen) thaw();
 
-        inline void set_graph(const IG& ig) {
-            _ig = &ig;
+            node_t n = _numNodes++;
+
+            std::vector<edge_dest_t> T;  // empty vector
+            flexible_graph[n] = T; // T is copied
+
+            return n + 1;
+        }
+
+        inline edge_t add_edge(node_t n, node_t m) {
+            assert(is_node(n));
+            assert(is_node(m));
+
+            if (_frozen) thaw();
+
+            edge_t e = _numEdges++;
+
+            edge_dest_t T;
+            T.dest = m;
+            T.edge = e;
+
+            flexible_graph[n].push_back(T);
+
+            return e + 1;
+        }
+
+	public:
+        inline void set_graph(const IG& ig) { _ig = &ig; }
+
+        inline void update_graph() {
             clear_graph();
 
             for (uint32 i = 0; i < inf.nDualVars; i++) {
@@ -39,9 +67,9 @@ namespace pFROST {
             }
 
             pfrost->workerPool.doWorkForEach((uint32)0, inf.nDualVars, [&](uint32 i) {
-                for (uint32 j = 0; j < ig[i].children().size(); j++) {
-                    if (!ig[i].children()[j].second->deleted()) {
-                        add_edge(i, ig[i].children()[j].first);
+                for (uint32 j = 0; j < (*_ig)[i].children().size(); j++) {
+                    if (!(*_ig)[i].children()[j].second->deleted()) {
+                        add_edge(i, (*_ig)[i].children()[j].first);
                     }
                 }
             });
