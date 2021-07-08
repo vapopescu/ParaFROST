@@ -33,6 +33,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfnode.h"
 #include "pfworker.h"
 #include <atomic>
+#include <algorithm>
 
 namespace pFROST {
 	/*****************************************************/
@@ -510,18 +511,33 @@ namespace pFROST {
 			inf.nClauses = inf.n_cls_after;
 		}
 		inline void		countAll			() {
-			std::atomic<uint32> c = 0, l = 0;
+			std::atomic<uint32> cls = 0, lits = 0;
+			std::atomic<int> threadIdx;
+			uint32 batchSize = scnf.size() / workerPool.count();
+			uint32 remainder = scnf.size() % workerPool.count();
 
-			workerPool.doWorkForEach((size_t)0, scnf.size(), [&](size_t i) {
-				if (scnf[i]->original() || scnf[i]->learnt()) {
-					c++;
-					l += scnf[i]->size();
+			workerPool.doWork([&] {
+				int tid = threadIdx++;
+				uint32 c = 0;
+				uint32 l = 0;
+
+				uint32 begin = batchSize * tid + std::min((uint32)tid, remainder);
+				uint32 end = begin + batchSize + (tid < remainder ? 1 : 0);
+				
+				for (uint32 i = begin; i < end; i++) {
+					if (scnf[i]->original() || scnf[i]->learnt()) {
+						c++;
+						l += scnf[i]->size();
+					}
 				}
+
+				cls += c;
+				lits += l;
 			});
 			workerPool.join();
 
-			inf.n_cls_after = c;
-			inf.n_lits_after = l;
+			inf.n_cls_after = cls;
+			inf.n_lits_after = lits;
 		}
 		inline void		countCls			() {
 			inf.n_cls_after = 0;

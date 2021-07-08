@@ -100,16 +100,21 @@ namespace pFROST {
 		{
 			std::unique_lock<std::mutex> lock(_mutex);
 			IntType idx = begin;
-			IntType batchSize = (end - begin - 1) / _workers.size() + 1;
-			if (maxBatch > 0 && batchSize > maxBatch) batchSize = maxBatch;
+			IntType batchSize = (end - begin) / _workers.size();
+			IntType remainder = (end - begin) % _workers.size();
+			if (maxBatch > 0 && batchSize > maxBatch) {
+				batchSize = maxBatch;
+				remainder = 0;
+			}
 
 			while (idx < end) {
-				if (idx + batchSize > end) batchSize = end - idx;
-				_jobQueue.push_back([this, idx, batchSize, job] {
-					for (IntType j = idx; j < idx + batchSize; j++)
+				IntType thisBatchSize = idx < remainder ? batchSize + 1 : batchSize;
+				if (idx + thisBatchSize > end) thisBatchSize = end - idx;
+				_jobQueue.push_back([this, idx, thisBatchSize, job] {
+					for (IntType j = idx; j < idx + thisBatchSize; j++)
 						job(j);
 				});
-				idx += batchSize;
+				idx += thisBatchSize;
 			}
 
 			_workerCV.notify_all();

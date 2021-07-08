@@ -1005,7 +1005,7 @@ namespace SIGmA {
 
 	inline void insert_ig_edge(const S_REF& c, IG& ig)
 	{
-		assert(c_.size() == 2);
+		assert(c->size() == 2);
 
 		uint32 lit1 = c->lit(0), lit2 = c->lit(1);
 		ig[lit1].lock(); ig[lit1].insertParent(FLIP(lit2), c); ig[lit1].unlock();
@@ -1016,7 +1016,7 @@ namespace SIGmA {
 
 	inline void append_ig_edge(const S_REF& c, IG& ig)
 	{
-		assert(c_.size() == 2);
+		assert(c->size() == 2);
 
 		uint32 lit1 = c->lit(0), lit2 = c->lit(1);
 		ig[lit1].lock(); ig[lit1].appendParent(FLIP(lit2), c); ig[lit1].unlock();

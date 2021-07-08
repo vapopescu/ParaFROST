@@ -61,7 +61,6 @@ namespace pFROST {
 		inline void setNumThreads(const unsigned int& num_threads) { this->num_threads = num_threads; }
 		inline void setMethod(const unsigned int& method) { this->method = method; }
 		inline void setGraph(const IG& ig) { G.set_graph(ig); }
-		inline void updateGraph() { G.update_graph(); }
 
 		inline node_t* getSCC() {
 			// Initialize
@@ -93,6 +92,7 @@ namespace pFROST {
 			run();
 
 			// Cleanup
+			G.thaw();
 			finalize_color();
 			//finalize_analyze();
 			switch (method) {
@@ -103,7 +103,7 @@ namespace pFROST {
 				break;
 			default:
 				break;
-		}
+			}
 
 			return G_SCC;
 		}

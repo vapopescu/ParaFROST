@@ -21,6 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfsolve.h"
 #include "gm.h"
 
+#include <atomic>
 #include <omp.h>
 
 namespace pFROST {
@@ -59,54 +60,72 @@ namespace pFROST {
 	public:
         inline void set_graph(const IG& ig) { _ig = &ig; }
 
-        inline void update_graph() {
-            clear_graph();
-
-            for (uint32 i = 0; i < inf.nDualVars; i++) {
-                add_node();
-            }
-
-            pfrost->workerPool.doWorkForEach((uint32)0, inf.nDualVars, [&](uint32 i) {
-                for (uint32 j = 0; j < (*_ig)[i].children().size(); j++) {
-                    if (!(*_ig)[i].children()[j].second->deleted()) {
-                        add_edge(i, (*_ig)[i].children()[j].first);
-                    }
-                }
-            });
-            pfrost->workerPool.join();
-        }
-
 		inline void freeze() {
             if (_frozen) return;
 
-            node_t n_nodes = num_nodes();
-            edge_t n_edges = num_edges();
+            std::atomic<int> threadIdx;
+            std::atomic<uint32> numEdges = 0;
+            uint32* out_degree = new uint32[inf.nDualVars];
+
+            uint32 batchSize = inf.nDualVars / pfrost->workerPool.count();
+            uint32 remainder = inf.nDualVars % pfrost->workerPool.count();
+
+            pfrost->workerPool.doWork([&] {
+                int tid = threadIdx++;
+                uint32 n = 0;
+
+                uint32 begin = batchSize * tid + std::min((uint32)tid, remainder);
+                uint32 end = begin + batchSize + (tid < remainder ? 1 : 0);
+
+                for (uint32 i = begin; i < end; i++) {
+                    uint32 deg = 0;
+                    for (uint32 j = 0; j < (*_ig)[i].children().size(); j++) {
+                        if (!(*_ig)[i].children()[j].second->deleted()) deg++;
+                    }
+                    out_degree[i] = deg;
+                    n += deg;
+                }
+
+                numEdges += n;
+            });
+            pfrost->workerPool.join();
+
+            node_t n_nodes = (node_t)inf.nDualVars;
+            edge_t n_edges = (edge_t)numEdges;
 
             allocate_memory_for_frozen_graph(n_nodes, n_edges);
 
             e_idx2id = new edge_t[n_edges];
             e_id2idx = new edge_t[n_edges];
 
-            // iterate over graph and make new structure
-            edge_t next_edge = 0;
+            // calculate beginning for each edge
+            begin[0] = 0;
             for (node_t i = 0; i < n_nodes; i++) {
-                std::vector<edge_dest_t>& Nbrs = flexible_graph[i];
-                begin[i] = next_edge;
-
-                std::vector<edge_dest_t>::iterator I;
-                for (I = Nbrs.begin(); I != Nbrs.end(); I++) {
-                    node_id dest = (*I).dest;         // for node ID = IDX
-                    edge_id edgeID = (*I).edge;
-
-                    node_idx[next_edge] = dest;
-
-                    e_idx2id[next_edge] = edgeID;      // IDX and ID are different for edge
-                    e_id2idx[edgeID] = next_edge;
-
-                    next_edge++;
-                }
+                begin[i+1] = begin[i] + out_degree[i];
             }
-            begin[n_nodes] = next_edge;
+            delete[] out_degree;
+            assert(begin[n_nodes] == n_edges);
+
+            // iterate over graph and make new structure
+            pfrost->workerPool.doWorkForEach((node_t)0, n_nodes, [&](node_t i) {
+                const uint32& lit1 = (uint32)i;
+                edge_t next_edge = begin[i];
+
+                for (uint32 j = 0; j < (*_ig)[lit1].children().size(); j++) {
+                    if (!(*_ig)[lit1].children()[j].second->deleted()) {
+                        const uint32& lit2 = (*_ig)[lit1].children()[j].first;
+
+                        node_idx[next_edge] = (node_id)lit2;
+                        e_idx2id[next_edge] = next_edge;
+                        e_id2idx[next_edge] = next_edge;
+
+                        next_edge++;
+                    }
+                }
+
+                assert(next_edge == begin[i + 1]);
+            });
+            pfrost->workerPool.join();
 
             _frozen = true;
             _semi_sorted = false;

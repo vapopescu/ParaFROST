@@ -109,13 +109,6 @@ void ParaFROST::IGR()
 		PFLOGN2(2, " Reasoning on the implication graph..");
 		if (opts.profile_simp) timer.pstart();
 
-		workerPool.doWorkForEach((uint32)0, inf.nDualVars, [this](uint32 i) {
-			ig[i].clear(true);
-		});
-		workerPool.join();
-
-		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[0] += timer.pcpuTime();
-
 		// Initialize IG based on original binary clauses.
 		workerPool.doWorkForEach((size_t)0, scnf.size(), [this](size_t i) {
 			S_REF c = scnf[i];
@@ -123,7 +116,7 @@ void ParaFROST::IGR()
 		});
 		workerPool.join();
 
-		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[1] += timer.pcpuTime();
+		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[0] += timer.pcpuTime();
 
 		workerPool.doWorkForEach((uint32)0, ig.size(), [this](uint32 i) {
 			ig[i].sortEdges();
@@ -137,7 +130,7 @@ void ParaFROST::IGR()
 		bool done = false;
 		int hbrRetries = opts.hbr_max;
 
-		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[2] += timer.pcpuTime();
+		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[1] += timer.pcpuTime();
 
 		while (!done && cnfstate == UNSOLVED) {
 			if (opts.profile_simp) timer.pstart();
@@ -151,7 +144,7 @@ void ParaFROST::IGR()
 				if (prop(&bin_check) < 0) break;
 			}
 
-			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[3] += timer.pcpuTime(), timer.pstart();
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[2] += timer.pcpuTime(), timer.pstart();
 
 			workerPool.doWorkForEach((size_t)0, bin_check.size(), [&](size_t i) {
 				S_REF c = bin_check[i];
@@ -164,13 +157,12 @@ void ParaFROST::IGR()
 			resetQueue.reserve(inf.nDualVars);
 			bool sccScan = true;
 
-			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[4] += timer.pcpuTime();
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[3] += timer.pcpuTime();
 
 			while (sccScan) {
 				if (opts.profile_simp) timer.pstart();
 
 				// Compute SCC for each node.
-				sccWrapper.updateGraph();
 				node_t* scc = sccWrapper.getSCC();
 				std::atomic<uint32> sccCount = 0;
 				std::atomic<bool> newEdge = false;
@@ -181,7 +173,7 @@ void ParaFROST::IGR()
 				});
 				workerPool.join();
 
-				if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[5] += timer.pcpuTime(), timer.pstart();
+				if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[4] += timer.pcpuTime(), timer.pstart();
 
 				// Replace each node with its SCC representative.
 				workerPool.doWorkForEach((uint32)1, inf.maxVar, [&](uint32 v) {
@@ -206,7 +198,7 @@ void ParaFROST::IGR()
 				delete[] scc;
 				if (!newEdge) sccScan = false;
 
-				if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[6] += timer.pcpuTime();
+				if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[5] += timer.pcpuTime();
 			}
 
 			if (opts.profile_simp) timer.pstart();
@@ -268,7 +260,7 @@ void ParaFROST::IGR()
 			// Scan IG for exploration starting points.
 			uVec1D exploreQueue;
 
-			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[7] += timer.pcpuTime(), timer.pstart();
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[6] += timer.pcpuTime(), timer.pstart();
 
 			workerPool.doWorkForEach((uint32)2, inf.nDualVars, [&](uint32 lit) {
 				if (!ig[lit].isExplored()) {
@@ -315,7 +307,7 @@ void ParaFROST::IGR()
 			int exploreWorking = workerPool.count();
 			exploreQueue.reserve(inf.nDualVars);
 
-			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[8] += timer.pcpuTime(), timer.pstart();
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[7] += timer.pcpuTime(), timer.pstart();
 
 			workerPool.doWork([&] {
 				uint32 lit = 0;
@@ -618,7 +610,7 @@ void ParaFROST::IGR()
 			}
 			if (clausesAdded) hbrRetries--;
 
-			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[9] += timer.pcpuTime();
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[8] += timer.pcpuTime();
 
 			// Exit condition
 			if (trail.size() == sp->propagated && exploreIdx == exploreQueue.size() && !clausesAdded) done = true;

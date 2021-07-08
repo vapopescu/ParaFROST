@@ -205,7 +205,7 @@ void ParaFROST::sigmify()
 		if (cnfstate != UNSAT) {
 			assert(sp->propagated == trail.size());
 			if (interrupted()) killSolver();
-			occurs.clear(true), ot.clear(true);
+			occurs.clear(true), ot.clear(true), ig.clear(true);
 			countFinal();
 			shrinkSimp(), assert(inf.nClauses == scnf.size());
 			stats.sigmifications++;
