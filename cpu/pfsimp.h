@@ -1003,6 +1003,36 @@ namespace SIGmA {
 		}
 	}
 
+	inline void insert_ig_edge(const S_REF& c, IG& ig)
+	{
+		assert(c_.size() == 2);
+
+		uint32 lit1 = c->lit(0), lit2 = c->lit(1);
+		ig[lit1].lock(); ig[lit1].insertParent(FLIP(lit2), c); ig[lit1].unlock();
+		ig[lit2].lock(); ig[lit2].insertParent(FLIP(lit1), c); ig[lit2].unlock();
+		ig[FLIP(lit1)].lock(); ig[FLIP(lit1)].insertChild(lit2, c); ig[FLIP(lit1)].unlock();
+		ig[FLIP(lit2)].lock(); ig[FLIP(lit2)].insertChild(lit1, c); ig[FLIP(lit2)].unlock();
+	}
+
+	inline void append_ig_edge(const S_REF& c, IG& ig)
+	{
+		assert(c_.size() == 2);
+
+		uint32 lit1 = c->lit(0), lit2 = c->lit(1);
+		ig[lit1].lock(); ig[lit1].appendParent(FLIP(lit2), c); ig[lit1].unlock();
+		ig[lit2].lock(); ig[lit2].appendParent(FLIP(lit1), c); ig[lit2].unlock();
+		ig[FLIP(lit1)].lock(); ig[FLIP(lit1)].appendChild(lit2, c); ig[FLIP(lit1)].unlock();
+		ig[FLIP(lit2)].lock(); ig[FLIP(lit2)].appendChild(lit1, c); ig[FLIP(lit2)].unlock();
+	}
+
+	inline void delete_ig_edge(const uint32& lit1, const uint32& lit2, IG& ig)
+	{
+		ig[lit1].lock(); ig[lit1].deleteParent(FLIP(lit2)); ig[lit1].unlock();
+		ig[lit2].lock(); ig[lit2].deleteParent(FLIP(lit1)); ig[lit2].unlock();
+		ig[FLIP(lit1)].lock(); ig[FLIP(lit1)].deleteChild(lit2); ig[FLIP(lit1)].unlock();
+		ig[FLIP(lit2)].lock(); ig[FLIP(lit2)].deleteChild(lit1); ig[FLIP(lit2)].unlock();
+	}
+
 	inline bool clause_replace(const S_REF& c, const uint32& oldLit, const uint32& newLit, IG& ig)
 	{
 		// Replace literals avoiding duplication.
@@ -1041,20 +1071,10 @@ namespace SIGmA {
 			if (c->lit(1) == newLit) otherLit = c->lit(0);
 			else otherLit = c->lit(1);
 
-			if (prevSize == 2) {
-				ig[oldLit].lock(); ig[oldLit].deleteParent(FLIP(otherLit)); ig[oldLit].unlock();
-				ig[otherLit].lock(); ig[otherLit].deleteParent(FLIP(oldLit)); ig[otherLit].unlock();
-				ig[FLIP(oldLit)].lock(); ig[FLIP(oldLit)].deleteChild(otherLit); ig[FLIP(oldLit)].unlock();
-				ig[FLIP(otherLit)].lock(); ig[FLIP(otherLit)].deleteChild(oldLit); ig[FLIP(otherLit)].unlock();
-			}
-			else {
-				newEdge = true;
-			}
+			if (prevSize == 2) delete_ig_edge(oldLit, otherLit, ig);
+			else newEdge = true;
 
-			ig[newLit].lock(); ig[newLit].insertParent(FLIP(otherLit), c); ig[newLit].unlock();
-			ig[otherLit].lock(); ig[otherLit].insertParent(FLIP(newLit), c); ig[otherLit].unlock();
-			ig[FLIP(newLit)].lock(); ig[FLIP(newLit)].insertChild(otherLit, c); ig[FLIP(newLit)].unlock();
-			ig[FLIP(otherLit)].lock(); ig[FLIP(otherLit)].insertChild(newLit, c); ig[FLIP(otherLit)].unlock();
+			insert_ig_edge(c, ig);
 		}
 		return newEdge;
 	}

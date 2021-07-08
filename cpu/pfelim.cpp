@@ -22,7 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 using namespace pFROST;
 using namespace SIGmA;
 
-int ParaFROST::prop()
+int ParaFROST::prop(SCNF* bin_check)
 {
 	std::mutex m;
 	std::condition_variable cv;
@@ -81,6 +81,11 @@ int ParaFROST::prop()
 						break;
 					}
 				}
+				if (c->size() == 2 && bin_check != nullptr) {
+					bin_check->lock();
+					bin_check->push(c);
+					bin_check->unlock();
+				}
 				c->unlock();
 			}
 			// delete assign lists
@@ -111,29 +116,42 @@ void ParaFROST::IGR()
 
 		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[0] += timer.pcpuTime();
 
+		// Initialize IG based on original binary clauses.
+		workerPool.doWorkForEach((size_t)0, scnf.size(), [this](size_t i) {
+			S_REF c = scnf[i];
+			if (!c->deleted() && c->size() == 2) append_ig_edge(c, ig);
+		});
+		workerPool.join();
+
+		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[1] += timer.pcpuTime();
+
+		workerPool.doWorkForEach((uint32)0, ig.size(), [this](uint32 i) {
+			ig[i].sortEdges();
+		});
+		workerPool.join();
+
 		bool done = false;
 		int hbrRetries = opts.hbr_max;
+
+		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[2] += timer.pcpuTime();
+
 		while (!done && cnfstate == UNSOLVED) {
 			if (opts.profile_simp) timer.pstart();
 
 			// Propagate boolean constraints
 			std::mutex propagateMutex;
+			SCNF bin_check;
+			bin_check.reserve(INIT_CAP);
+
 			if (sp->propagated < trail.size()) {
-				if (prop() < 0) break;
+				if (prop(&bin_check) < 0) break;
 			}
 
-			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[1] += timer.pcpuTime(), timer.pstart();
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[3] += timer.pcpuTime(), timer.pstart();
 
-			// Initialize IG based on original binary clauses.
-			workerPool.doWorkForEach((size_t)0, scnf.size(), [this](size_t i) {
-				S_REF c = scnf[i];
-				if (!c->deleted() && c->size() == 2) {
-					uint32 lit1 = c->lit(0), lit2 = c->lit(1);
-					ig[lit1].lock(); ig[lit1].insertParent(FLIP(lit2), c); ig[lit1].unlock();
-					ig[lit2].lock(); ig[lit2].insertParent(FLIP(lit1), c); ig[lit2].unlock();
-					ig[FLIP(lit1)].lock(); ig[FLIP(lit1)].insertChild(lit2, c); ig[FLIP(lit1)].unlock();
-					ig[FLIP(lit2)].lock(); ig[FLIP(lit2)].insertChild(lit1, c); ig[FLIP(lit2)].unlock();
-				}
+			workerPool.doWorkForEach((size_t)0, bin_check.size(), [&](size_t i) {
+				S_REF c = bin_check[i];
+				if (!c->deleted() && c->size() == 2) insert_ig_edge(c, ig);
 			});
 			workerPool.join();
 
@@ -145,7 +163,7 @@ void ParaFROST::IGR()
 			sccWrapper->setMethod(SCC_UFSCC);
 			bool sccScan = true;
 
-			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[2] += timer.pcpuTime();
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[4] += timer.pcpuTime();
 
 			while (sccScan) {
 				if (opts.profile_simp) timer.pstart();
@@ -162,7 +180,7 @@ void ParaFROST::IGR()
 				});
 				workerPool.join();
 
-				if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[3] += timer.pcpuTime(), timer.pstart();
+				if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[5] += timer.pcpuTime(), timer.pstart();
 
 				// Replace each node with its SCC representative.
 				workerPool.doWorkForEach((uint32)1, inf.maxVar, [&](uint32 v) {
@@ -187,7 +205,7 @@ void ParaFROST::IGR()
 				delete[] scc;
 				if (!newEdge) sccScan = false;
 
-				if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[4] += timer.pcpuTime();
+				if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[6] += timer.pcpuTime();
 			}
 
 			if (opts.profile_simp) timer.pstart();
@@ -250,7 +268,7 @@ void ParaFROST::IGR()
 			// Scan IG for exploration starting points.
 			uVec1D exploreQueue;
 
-			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[5] += timer.pcpuTime(), timer.pstart();
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[7] += timer.pcpuTime(), timer.pstart();
 
 			workerPool.doWorkForEach((uint32)2, inf.nDualVars, [&](uint32 lit) {
 				if (!ig[lit].isExplored()) {
@@ -297,7 +315,7 @@ void ParaFROST::IGR()
 			int exploreWorking = workerPool.count();
 			exploreQueue.reserve(inf.nDualVars);
 
-			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[6] += timer.pcpuTime(), timer.pstart();
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[8] += timer.pcpuTime(), timer.pstart();
 
 			workerPool.doWork([&] {
 				uint32 lit = 0;
@@ -596,6 +614,7 @@ void ParaFROST::IGR()
 					clausesAdded = true;
 					S_REF& c = newClauses[i][j];
 					newResolvent(c);
+					insert_ig_edge(c, ig);
 					ot[c->lit(0)].push(c);
 					ot[c->lit(1)].push(c);
 				}
@@ -603,7 +622,7 @@ void ParaFROST::IGR()
 			}
 			if (clausesAdded) hbrRetries--;
 
-			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[7] += timer.pcpuTime();
+			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[9] += timer.pcpuTime();
 
 			// Exit condition
 			if (trail.size() == sp->propagated && exploreIdx == exploreQueue.size() && !clausesAdded) done = true;

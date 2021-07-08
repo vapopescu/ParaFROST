@@ -191,6 +191,7 @@
     <ClInclude Include="pfvmap.h" />
     <ClInclude Include="pfwatch.h" />
     <ClInclude Include="pfworker.h" />
+    <ClInclude Include="scc_graph.h" />
     <ClInclude Include="scc_wrapper.h" />
   </ItemGroup>
   <ItemGroup>

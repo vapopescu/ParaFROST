@@ -23,6 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "my_work_queue.h"
 #include "common_main.h"
 #include "gm.h"
+#include "scc_graph.h"
 
 #include <omp.h>
 
@@ -38,7 +39,9 @@ namespace pFROST {
 
 	class SCCWrapper : main_t {
 	protected: 
+		scc_graph G;
 		unsigned int method;
+
 		inline bool run() {
 			switch (method) {
 			case SCC_TARJAN:
@@ -57,8 +60,9 @@ namespace pFROST {
 	public:
 		inline void setNumThreads(const unsigned int& num_threads) { this->num_threads = num_threads; }
 		inline void setMethod(const unsigned int& method) { this->method = method; }
+		inline void setGraph(const IG& ig) { G.set_graph(ig); }
 
-		inline void setGraph(const IG& ig) {
+		inline void freezeGraph(const IG& ig) {
 			G.clear_graph();
 
 			for (uint32 i = 0; i < inf.nDualVars; i++) {
@@ -73,13 +77,15 @@ namespace pFROST {
 				}
 			});
 			pfrost->workerPool.join();
+
+			G.freeze();
 		}
 
 		inline node_t* getSCC() {
 			// Initialize
 			gm_rt_initialize();
 			omp_set_num_threads(num_threads);
-			G.make_reverse_edges();
+			G.freeze();
 
 			G_num_nodes = G.num_nodes();
 			G_SCC = new node_t[G.num_nodes()];

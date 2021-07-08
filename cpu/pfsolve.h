@@ -608,7 +608,7 @@ namespace pFROST {
 		void	shrinkSimp			();
 		void	sigmify				();
 		bool	LCVE				();
-		int		prop				();
+		int		prop				(SCNF* = nullptr);
 		void	bve					();
 		void	IGR					();
 		void	CE					();
@@ -621,7 +621,7 @@ namespace pFROST {
 		void	reduceOL			(OL&);
 		void	extract				(const BCNF&);
 		void	awaken				(const bool& = false);
-		void	createOT	(const bool& = true);
+		void	createOT			(const bool& = true);
 		bool	propClause			(S_REF, const uint32&);
 		void	strengthen			(S_REF, const uint32&);
 		void	newSClause			(S_REF);
