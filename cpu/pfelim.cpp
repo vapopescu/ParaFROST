@@ -408,43 +408,45 @@ void ParaFROST::IGR()
 
 					// Check if literal is failed.
 					bool failed = false;
-					for (uint32 i = 0; i < ds.size(); i++) {
-						if (flipLit == ds[i]) {
-							ig[lit].clear(true);
-							ig[lit].markExplored();
-							ig[lit].unlock();
+					if (opts.fle_en) {
+						for (uint32 i = 0; i < ds.size(); i++) {
+							if (flipLit == ds[i]) {
+								ig[lit].clear(true);
+								ig[lit].markExplored();
+								ig[lit].unlock();
 
-							ig[flipLit].lockRead();
-							propagateMutex.lock();
+								ig[flipLit].lockRead();
+								propagateMutex.lock();
 
-							if (cnfstate == UNSOLVED) {
-								uVec1D& units = ig[flipLit].descendants();
-								for (uint32 j = 0; j < units.size(); j++) {
-									if (unassigned(units[j])) enqueueOrg(units[j]);
-									else { propagateMutex.unlock(); cnfstate = UNSAT; exploreCV.notify_all(); break; }
+								if (cnfstate == UNSOLVED) {
+									uVec1D& units = ig[flipLit].descendants();
+									for (uint32 j = 0; j < units.size(); j++) {
+										if (unassigned(units[j])) enqueueOrg(units[j]);
+										else { propagateMutex.unlock(); cnfstate = UNSAT; exploreCV.notify_all(); break; }
+									}
 								}
-							}
 
-							if (cnfstate == UNSOLVED) {
-								Vec<Edge>& units = ig[flipLit].children();
-								for (uint32 j = 0; j < units.size(); j++) {
-									if (unassigned(units[j].first)) enqueueOrg(units[j].first);
-									else { propagateMutex.unlock(); cnfstate = UNSAT; exploreCV.notify_all();  break; }
+								if (cnfstate == UNSOLVED) {
+									Vec<Edge>& units = ig[flipLit].children();
+									for (uint32 j = 0; j < units.size(); j++) {
+										if (unassigned(units[j].first)) enqueueOrg(units[j].first);
+										else { propagateMutex.unlock(); cnfstate = UNSAT; exploreCV.notify_all();  break; }
+									}
 								}
+
+								if (unassigned(flipLit)) enqueueOrg(flipLit);
+								else { cnfstate = UNSAT; exploreCV.notify_all(); }
+
+								propagateMutex.unlock();
+								ig[flipLit].unlockRead();
+
+								failed = true;
+								break;
 							}
-
-							if (unassigned(flipLit)) enqueueOrg(flipLit);
-							else { cnfstate = UNSAT; exploreCV.notify_all(); }
-
-							propagateMutex.unlock();
-							ig[flipLit].unlockRead();
-
-							failed = true;
-							break;
 						}
-					}
 
-					if (failed) { lit = 0; continue; }
+						if (failed) { lit = 0; continue; }
+					}
 
 					// Hyper-Binary-Resolution
 					if (opts.hbr_en && hbrRetries > 0) {
