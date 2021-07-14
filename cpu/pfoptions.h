@@ -61,6 +61,7 @@ namespace pFROST {
 		int		subsume_inc, subsume_min_occs, subsume_min_checks, subsume_max_checks, subsume_max_csize;
 		int		hbr_max, rse_max;
 		int		worker_count;
+		int		batch_max;
 		//------------------------------------------//
 		bool	model_en;
 		bool	proof_en;

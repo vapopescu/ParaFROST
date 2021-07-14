@@ -123,7 +123,7 @@ namespace pFROST {
 		template<class IntType, class Function>
 		inline void doWorkForEach(const IntType& begin, const IntType& end, const Function& job)
 		{
-			doWorkForEach(begin, end, (IntType)256, job);
+			doWorkForEach(begin, end, (IntType)pfrost->opts.batch_max, job);
 		}
 
 		inline void join() const {
