@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
-#include "pfsolve.h"
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -37,14 +36,16 @@ namespace pFROST {
 		mutable std::condition_variable		_poolCV;
 		bool								_terminate;
 		unsigned int						_waiting;
+		unsigned int						_max_batch;
 
 	public:
-		inline void init(unsigned int threads)
+		inline void init(unsigned int threads, unsigned int max_batch)
 		{
 			_workers.clear();
 			_jobQueue.clear();
 			_terminate = false;
 			_waiting = 0;
+			_max_batch = max_batch;
 			if (threads == 0) threads = 1;
 
 			for (int i = 0; i < threads; i++) {
@@ -124,7 +125,7 @@ namespace pFROST {
 		template<class IntType, class Function>
 		inline void doWorkForEach(const IntType& begin, const IntType& end, const Function& job)
 		{
-			doWorkForEach(begin, end, (IntType)pfrost->opts.batch_max, job);
+			doWorkForEach(begin, end, (IntType)_max_batch, job);
 		}
 
 		inline void join() const {
