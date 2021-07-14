@@ -642,6 +642,7 @@ namespace pFROST {
 		void	strengthen			(S_REF, const uint32&);
 		void	newSClause			(S_REF);
 		void	newResolvent		(S_REF);
+		void	newBinary			(S_REF);
 		//==========================================//
 		//			       Printers                 //
 		//==========================================//

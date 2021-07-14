@@ -83,6 +83,24 @@ void ParaFROST::newResolvent(S_REF s)
 	}
 }
 
+void ParaFROST::newBinary(S_REF s)
+{
+	assert(*s != NULL);
+	assert(s->size() == 2);
+	assert(s->hasZero() < 0);
+	assert(!s->status());
+	assert(s->isSorted());
+	s->set_status(LEARNT);
+	s->markAdded();
+	s->calcSig();
+	scnf.push(s);
+	if (opts.proof_en) {
+		wrProof('a');
+		wrProof(*s, s->size());
+		wrProof(0);
+	}
+}
+
 void ParaFROST::newSClause(S_REF s)
 {
 	assert(*s != NULL);

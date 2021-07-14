@@ -112,7 +112,7 @@ void ParaFROST::IGR()
 		// Initialize IG based on original binary clauses.
 		workerPool.doWorkForEach((size_t)0, scnf.size(), [this](size_t i) {
 			S_REF c = scnf[i];
-			if (!c->deleted() && c->size() == 2) append_ig_edge(c, ig);
+			if (c->size() == 2 /*&& c->original()*/ && !c->deleted()) append_ig_edge(c, ig);
 		});
 		workerPool.join();
 
@@ -421,7 +421,7 @@ void ParaFROST::IGR()
 								uVec1D& units = ig[flipLit].descendants();
 								for (uint32 j = 0; j < units.size(); j++) {
 									if (unassigned(units[j])) enqueueOrg(units[j]);
-									else { cnfstate = UNSAT; exploreCV.notify_all(); break; }
+									else { propagateMutex.unlock(); cnfstate = UNSAT; exploreCV.notify_all(); break; }
 								}
 							}
 
@@ -429,7 +429,7 @@ void ParaFROST::IGR()
 								Vec<Edge>& units = ig[flipLit].children();
 								for (uint32 j = 0; j < units.size(); j++) {
 									if (unassigned(units[j].first)) enqueueOrg(units[j].first);
-									else { cnfstate = UNSAT; exploreCV.notify_all();  break; }
+									else { propagateMutex.unlock(); cnfstate = UNSAT; exploreCV.notify_all();  break; }
 								}
 							}
 
@@ -444,7 +444,7 @@ void ParaFROST::IGR()
 						}
 					}
 
-					if (failed) { exploreTerminate = true; exploreCV.notify_all(); break; }
+					if (failed) { lit = 0; continue; }
 
 					// Hyper-Binary-Resolution
 					if (opts.hbr_en && hbrRetries > 0) {
@@ -478,71 +478,74 @@ void ParaFROST::IGR()
 							uint32 f_assign = FLIP(assign);
 							assert(assign > 1);
 
-							// reduce unsatisfied
-							for (uint32 i = 0; i < ot[f_assign].size(); i++) {
-								S_REF& c = ot[f_assign][i];
-								int unitIdx = -1;
-
-								for (uint32 k = 0; k < c->size(); k++) {
-									if (propClosure.contains(c->lit(k))) { unitIdx = -1; break; }
-									else if (!propClosure.contains(FLIP(c->lit(k)))) { 
-										if (unitIdx == -1) unitIdx = k; 
-										else { unitIdx = -1; break; };
-									}
-								}
-
-								if (unitIdx >= 0) {
-									uint32 unitLit = c->lit(unitIdx);
-									assert(unitLit > 1);
-
-									if (!propClosure.contains(FLIP(unitLit))) {
-										propQueue.push(unitLit);
-										propClosure.unionize(uVec1D({ unitLit }));
-									}
-									else {
-										// conflict => failed literal
-										propagateMutex.lock();
-										if (unassigned(flipLit)) enqueueOrg(flipLit);
-										else { cnfstate = UNSAT; exploreCV.notify_all(); break; }
-										propagateMutex.unlock();
-										break;
-									}
-								}
-
-								if (exploreTerminate) break;
-							}
-
-							//// remove satisfied
-							//for (int i = 0; i < ot[assign].size(); i++) {
-							//	S_REF c = ot[assign][i];
-							//	proxyMap[c].markDeleted();
-							//}
-
 							//// reduce unsatisfied
-							//for (int i = 0; i < ot[f_assign].size(); i++) {
-							//	S_REF c = ot[f_assign][i];
+							//for (uint32 i = 0; i < ot[f_assign].size(); i++) {
+							//	S_REF& c = ot[f_assign][i];
+							//	int unitIdx = -1;
 
-							//	if (proxyMap.count(c) == 0) proxyMap.insert(std::make_pair(c, *c));
-							//	assert(proxyMap[c].size() || proxyMap[c].deleted());
-							//	if (proxyMap[c].deleted() || propClause(&proxyMap[c], f_assign)) continue;
-
-							//	if (proxyMap[c].size() == 0) {
-							//		// conflict => failed literal
-							//		propagateMutex.lock();
-							//		if (unassigned(flipLit)) enqueueOrg(flipLit);
-							//		else { cnfstate = UNSAT; exploreCV.notify_all(); break; }
-							//		propagateMutex.unlock();
-							//		break;
-							//	}
-							//	else if (proxyMap[c].size() == 1) {
-							//		uint32 propLit = *proxyMap[c];
-							//		assert(propLit > 1);
-							//		if (!propClosure.contains(propLit)) { 
-							//			propQueue.push(propLit);
-							//			propClosure.unionize(uVec1D({ propLit }));
+							//	for (uint32 k = 0; k < c->size(); k++) {
+							//		if (propClosure.contains(c->lit(k))) { unitIdx = -1; break; }
+							//		else if (!propClosure.contains(FLIP(c->lit(k)))) { 
+							//			if (unitIdx == -1) unitIdx = k; 
+							//			else { unitIdx = -1; break; };
 							//		}
 							//	}
+
+							//	if (unitIdx >= 0) {
+							//		uint32 unitLit = c->lit(unitIdx);
+							//		assert(unitLit > 1);
+
+							//		if (!propClosure.contains(FLIP(unitLit))) {
+							//			propQueue.push(unitLit);
+							//			propClosure.unionize(uVec1D({ unitLit }));
+							//		}
+							//		else {
+							//			// conflict => failed literal
+							//			propagateMutex.lock();
+							//			if (unassigned(flipLit)) enqueueOrg(flipLit);
+							//			else { cnfstate = UNSAT; exploreCV.notify_all(); break; }
+							//			propagateMutex.unlock();
+							//			break;
+							//		}
+							//	}
+
+							//	if (exploreTerminate) break;
 							//}
+
+							// remove satisfied
+							for (int i = 0; i < ot[assign].size(); i++) {
+								S_REF c = ot[assign][i];
+								proxyMap[c].markDeleted();
+							}
+
+							// reduce unsatisfied
+							for (int i = 0; i < ot[f_assign].size(); i++) {
+								S_REF c = ot[f_assign][i];
+
+								if (proxyMap.count(c) == 0) proxyMap.insert(std::make_pair(c, *c));
+								assert(proxyMap[c].size() || proxyMap[c].deleted());
+								if (proxyMap[c].deleted() || propClause(&proxyMap[c], f_assign)) continue;
+
+								if (proxyMap[c].size() == 0) {
+									// conflict => failed literal
+									propagateMutex.lock();
+									if (unassigned(flipLit)) enqueueOrg(flipLit);
+									else { propagateMutex.unlock(); cnfstate = UNSAT; exploreCV.notify_all(); break; }
+									failed = true;
+									propagateMutex.unlock();
+									break;
+								}
+								else if (proxyMap[c].size() == 1) {
+									uint32 propLit = *proxyMap[c];
+									assert(propLit > 1);
+									if (!propClosure.contains(propLit)) { 
+										propQueue.push(propLit);
+										propClosure.unionize(uVec1D({ propLit }));
+									}
+								}
+							}
+
+							if (exploreTerminate) break;
 						}
 
 						proxyMap.clear();
@@ -745,11 +748,6 @@ void ParaFROST::BVE()
 		uint32 resLit = 0;
 		for (uint32 i = 0; i < PVs.size(); i++) {
 			resLit += resolved[i].size();
-		}
-
-		uint32 resNum = 0;
-		for (uint32 i = 0; i < PVs.size(); i++) {
-			resNum += new_res[i].size();
 		}
 
 		model.resolved.reserve(model.resolved.size() + resLit + 1);
