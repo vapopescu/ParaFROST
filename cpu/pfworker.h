@@ -46,7 +46,7 @@ namespace pFROST {
 			_waiting = 0;
 			if (threads == 0) threads = 1;
 
-			for (int i = 0; i < threads; i++) {
+			for (unsigned int i = 0; i < threads; i++) {
 				_workers.push_back(std::thread([this] {
 					while (true) {
 						std::unique_lock<std::mutex> lock(_mutex);
@@ -88,7 +88,7 @@ namespace pFROST {
 		{
 			std::unique_lock<std::mutex> lock(_mutex);
 
-			for (int i = 0; i < _workers.size(); i++) {
+			for (unsigned int i = 0; i < _workers.size(); i++) {
 				_jobQueue.push_back(job);
 			}
 

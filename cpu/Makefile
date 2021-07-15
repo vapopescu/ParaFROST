@@ -34,11 +34,11 @@ WARN := -w
 ifeq ($(debug),1)
       CCFLAGS += -g
       BUILD_TYPE := debug
-      WARN :=
+      WARN := -Wall
 else  ifeq ($(assert),1)
       CCFLAGS += -O3 -use_fast_math
       BUILD_TYPE := release
-      WARN :=
+      WARN := -Wall
 else
       CCFLAGS += -O3 -use_fast_math -DNDEBUG
       BUILD_TYPE := release
