@@ -512,7 +512,7 @@ namespace pFROST {
 		}
 		inline void		countAll			() {
 			std::atomic<uint32> cls = 0, lits = 0;
-			std::atomic<int> threadIdx;
+			std::atomic<int> threadIdx = 0;
 			uint32 batchSize = scnf.size() / workerPool.count();
 			uint32 remainder = scnf.size() % workerPool.count();
 
