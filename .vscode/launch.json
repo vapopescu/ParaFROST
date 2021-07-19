@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/cpu/parafrost",
-            "args": ["-color", "-sigma", "-sigmalive", "-no-igr", "-no-ce", "--verbose=2", "${HOME}/benchmarks/easy/barman-pfile07-028.sas.ex.15.cnf"],
+            "args": ["-color", "-sigma", "-sigmalive", "-hbr", "-bce", "--verbose=2", "${HOME}/benchmarks/easy/barman-pfile07-028.sas.ex.15.cnf"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
