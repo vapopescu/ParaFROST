@@ -36,7 +36,7 @@ ifeq ($(debug),1)
       BUILD_TYPE := debug
       WARN := -Wall
 else  ifeq ($(assert),1)
-      CCFLAGS += -O3 -use_fast_math
+      CCFLAGS += -g -O3 -use_fast_math
       BUILD_TYPE := release
       WARN := -Wall
 else
