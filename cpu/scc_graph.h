@@ -63,7 +63,7 @@ namespace pFROST {
 		inline void freeze() {
             if (_frozen) return;
 
-            std::atomic<uint32> threadIdx;
+            std::atomic<uint32> threadIdx = 0;
             std::atomic<uint32> numEdges = 0;
             uint32* out_degree = new uint32[inf.nDualVars];
 
