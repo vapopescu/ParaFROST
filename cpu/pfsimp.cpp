@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 **********************************************************************************/
 
 #include "pfsimp.h"
+#include <cmath>
 
 using namespace pFROST;
 using namespace SIGmA;
@@ -27,7 +28,7 @@ void ParaFROST::createOT(const bool& rst)
 
 	// reset ot
 	if (rst) {
-		workerPool.doWorkForEach((size_t)1, (size_t)(inf.maxVar + 1), [this](size_t i) {
+		workerPool.doWorkForEach((uint32)1, inf.maxVar + 1, [&](uint32 i) {
 			uint32 p = V2L(i);
 			ot[p].clear();
 			ot[NEG(p)].clear();
@@ -37,7 +38,7 @@ void ParaFROST::createOT(const bool& rst)
 	}
 
 	// create ot
-	workerPool.doWorkForEach((size_t)0, (size_t)scnf.size(), [this](size_t i) {
+	workerPool.doWorkForEach((size_t)0, scnf.size(), [&](size_t i) {
 		SCLAUSE& c = *scnf[i];
 		if (c.learnt() || c.original()) {
 			assert(c.size());
@@ -281,7 +282,7 @@ inline void	ParaFROST::sigmaDelay() {
 		// update inprocessing trigger (inspired by Cadical) 
 		// but we decrease phases too
 		double current_inc = scale(opts.sigma_inc * (phase + 1.0));
-		lrn.sigma_conf_max = nConflicts + current_inc;
+		lrn.sigma_conf_max = nConflicts + (int64)std::floor(current_inc);
 		PFLOG2(2, " inprocessing limit increased to %lld conflicts by a weight of %.2f", lrn.sigma_conf_max, current_inc);
 		if (opts.phases > 2) {
 			opts.phases--;

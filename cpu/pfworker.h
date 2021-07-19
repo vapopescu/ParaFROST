@@ -84,7 +84,7 @@ namespace pFROST {
 			_jobQueue.clear();
 		}
 
-		inline unsigned int count() { return _workers.size(); }
+		inline unsigned int count() { return (unsigned int)_workers.size(); }
 
 		inline void doWork(const Job& job)
 		{
@@ -102,8 +102,8 @@ namespace pFROST {
 		{
 			std::unique_lock<std::mutex> lock(_mutex);
 			IntType idx = begin;
-			IntType batchSize = (end - begin) / _workers.size();
-			IntType remainder = (end - begin) % _workers.size();
+			IntType batchSize = (end - begin) / (IntType)_workers.size();
+			IntType remainder = (end - begin) % (IntType)_workers.size();
 			if (maxBatch > 0 && batchSize > maxBatch) {
 				batchSize = maxBatch;
 				remainder = 0;

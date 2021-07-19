@@ -837,7 +837,7 @@ namespace SIGmA {
 
 	inline void sub_x(S_REF& c, OL& other)
 	{
-		for (uint32 j = 0; j < other.size(); j++) {
+		for (int j = 0; j < other.size(); j++) {
 			S_REF d = other[j];
 			if (d->deleted()) continue;
 			if (d->size() >= c->size()) break;
@@ -947,7 +947,7 @@ namespace SIGmA {
 				if (k == 0) {
 					subsumed.copyFrom(*candidates); 
 					if (!pfrost->opts.hla_en) {
-						uint32 i = 0, n = 0;
+						int i = 0, n = 0;
 						while (i < subsumed.size()) {
 							S_REF& d = subsumed[i];
 							if (subset_sig(c->sig(), d->sig())) subsumed[n++] = subsumed[i];
@@ -956,7 +956,7 @@ namespace SIGmA {
 					}
 				}
 				else {
-					uint32 i = 0, j = 0, n = 0;
+					int i = 0, j = 0, n = 0;
 					while (i < subsumed.size() && j < candidates->size()) {
 						S_REF& d1 = subsumed[i], & d2 = (*candidates)[j];
 						if (d1->deleted() || less(d1, d2)) i++;
@@ -977,7 +977,7 @@ namespace SIGmA {
 			bool promote = false;
 			c->lock();
 			if (!c->deleted()) {
-				for (uint32 i = 0; i < subsumed.size(); i++) {
+				for (int i = 0; i < subsumed.size(); i++) {
 					S_REF d = subsumed[i];
 					if (d->tryLock()) {
 						if (!d->deleted()) {
@@ -1088,7 +1088,7 @@ namespace SIGmA {
 
 			// Rewrite clauses.
 			ot[oldLit].lock();
-			for (uint32 i = 0; i < ot[oldLit].size(); i++) {
+			for (int i = 0; i < ot[oldLit].size(); i++) {
 				if (!ot[oldLit][i]->deleted()) {
 					S_REF& c = ot[oldLit][i];
 

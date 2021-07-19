@@ -269,7 +269,7 @@ void ParaFROST::IGR()
 					Vec<Edge>& cs = ig[lit].children();
 					ig[lit].lockRead();
 
-					for (int i = 0; i < cs.size(); i++) {
+					for (uint32 i = 0; i < cs.size(); i++) {
 						if (!cs[i].second->deleted()) {
 							deadEnd = false;
 							uint32& child = cs[i].first;
@@ -754,7 +754,7 @@ void ParaFROST::BVE()
 
 		model.resolved.reserve(model.resolved.size() + resLit + 1);
 		for (uint32 i = 0; i < PVs.size(); i++) {
-			for (int j = 0; j < resolved[i].size(); j++) {
+			for (uint32 j = 0; j < resolved[i].size(); j++) {
 				model.resolved.push(resolved[i][j]);
 			}
 			model.resolved.push(resLit);

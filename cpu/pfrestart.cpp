@@ -24,7 +24,7 @@ bool ParaFROST::vibrate() {
 	if (vsidsOnly()) return true;
 	if (nConflicts >= lrn.stable_conf_max) {
 		lrn.stable = !lrn.stable;
-		opts.stabrestart_inc *= opts.stabrestart_rate;
+		opts.stabrestart_inc = (int64)std::floor(opts.stabrestart_inc * opts.stabrestart_rate);
 		if (opts.stabrestart_inc > int64(2e9))
 			opts.stabrestart_inc = int64(2e9);
 		lrn.stable_conf_max = nConflicts + opts.stabrestart_inc;
@@ -82,7 +82,7 @@ void ParaFROST::restart()
 void LUBYREST::update() {
 	if (!period || restart) return;
 	if (--countdown) return;
-	if ((u & -u) == v) u++, v = 1;
+	if ((u & (~u + 1)) == v) u++, v = 1;
 	else v <<= 1;
 	if (limited && v >= limit) u = v = 1;
 	countdown = v * period;

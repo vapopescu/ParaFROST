@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "pfsort.h"
 #include "pfsolve.h" 
+#include <cmath>
 using namespace pFROST;
 
 inline bool	ParaFROST::verifyMDM() {
@@ -299,7 +300,7 @@ void ParaFROST::MDMFuseMaster() {
 	if (opts.mdm_rounds && nConflicts >= lrn.mdm_conf_max) {
 		lrn.rounds = opts.mdm_rounds;
 		double current_inc = scale(double(opts.mdm_minc));
-		lrn.mdm_conf_max = nConflicts + current_inc;
+		lrn.mdm_conf_max = nConflicts + (int64)std::floor(current_inc);
 		PFLOG2(2, " MDM limit increased by (conflicts: %lld, Increment: %.2f) to %lld", nConflicts, current_inc, lrn.mdm_conf_max);
 	}
 }

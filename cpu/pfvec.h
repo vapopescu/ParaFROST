@@ -37,9 +37,9 @@ namespace pFROST {
 
 	template<class T, class S = uint32>
 	class Vec {
+		mutable std::shared_mutex _m;
 		T* _mem;
 		S sz, cap, maxCap;
-		mutable std::shared_mutex _m;
 
 		bool check(const S& idx) const {
 			if (idx >= sz) {
@@ -127,7 +127,7 @@ namespace pFROST {
 		}
 		__forceinline void		copyFrom	(const std::initializer_list<T>& copy) {
 			clear(true);
-			reserve(copy.size());
+			reserve((S)copy.size());
 			for (auto item : copy) push(item);
 		}
 		__forceinline void		copyFrom	(const Vec<T, S>& copy) {

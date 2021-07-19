@@ -56,7 +56,7 @@ bool ParaFROST::parser() {
 	stat(path.c_str(), &st);
 	size_t fsz = st.st_size;
 	PFLOG2(1, " Parsing CNF file \"%s%s%s\" (size: %s%.2f MB%s)",
-		CREPORTVAL, path.c_str(), CNORMAL, CREPORTVAL, ratio(fsz, uint64(MBYTE)), CNORMAL);
+		CREPORTVAL, path.c_str(), CNORMAL, CREPORTVAL, ratio((double)fsz, uint64(MBYTE)), CNORMAL);
 	timer.start();
 #ifdef __linux__
 	int fd = open(path.c_str(), O_RDONLY, 0);

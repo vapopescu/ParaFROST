@@ -63,7 +63,7 @@ namespace pFROST {
 		inline void freeze() {
             if (_frozen) return;
 
-            std::atomic<int> threadIdx;
+            std::atomic<uint32> threadIdx;
             std::atomic<uint32> numEdges = 0;
             uint32* out_degree = new uint32[inf.nDualVars];
 
@@ -71,10 +71,10 @@ namespace pFROST {
             uint32 remainder = inf.nDualVars % pfrost->workerPool.count();
 
             pfrost->workerPool.doWork([&] {
-                int tid = threadIdx++;
+                uint32 tid = threadIdx++;
                 uint32 n = 0;
 
-                uint32 begin = batchSize * tid + std::min((uint32)tid, remainder);
+                uint32 begin = batchSize * tid + std::min(tid, remainder);
                 uint32 end = begin + batchSize + (tid < remainder ? 1 : 0);
 
                 for (uint32 i = begin; i < end; i++) {

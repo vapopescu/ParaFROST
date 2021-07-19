@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 **********************************************************************************/
 
 #include "pfsolve.h"
+#include <cmath>
 using namespace pFROST;
 
 struct LEARNT_CMP {
@@ -74,10 +75,10 @@ void ParaFROST::reduce()
 	reduceLearnts();
 	recycle();
 	unprotectReasons();
-	double current_inc = opts.reduce_inc * (stats.reduces + 1);
+	double current_inc = (double)opts.reduce_inc * (stats.reduces + 1);
 	reduceWeight(current_inc);
 	lrn.lastreduce = nConflicts;
-	lrn.reduce_conf_max = nConflicts + current_inc;
+	lrn.reduce_conf_max = nConflicts + (int64)std::floor(current_inc);
 	PFLOG2(2, " reduce limit increased to %lld conflicts by a weight %.2f", lrn.reduce_conf_max, current_inc);
 	if (shrunken && canMap()) map(); // "recycle" must be called beforehand
 }
@@ -98,7 +99,7 @@ void ParaFROST::reduceLearnts(const bool& sizeonly)
 		reduced.push(*r);
 	}
 	if (reduced.size()) {
-		uint32 pivot = opts.reduce_perc * reduced.size();
+		uint32 pivot = (uint32)std::floor(opts.reduce_perc * reduced.size());
 		PFLOGN2(2, " Reducing learnt database up to (%d clauses)..", pivot);
 		if (sizeonly) std::stable_sort(reduced.data(), reduced.end(), LEARNT_SZ_CMP(cm));
 		else std::stable_sort(reduced.data(), reduced.end(), LEARNT_CMP(cm));
@@ -132,9 +133,9 @@ void ParaFROST::reduceTop(const bool& sizeonly) {
 	stats.reduces++;
 	reduceLearnts(sizeonly);
 	filter(learnts);
-	double current_inc = opts.reduce_inc * (stats.reduces + 1);
+	double current_inc = (double)opts.reduce_inc * (stats.reduces + 1);
 	reduceWeight(current_inc);
 	lrn.lastreduce = nConflicts;
-	lrn.reduce_conf_max = nConflicts + current_inc;
+	lrn.reduce_conf_max = nConflicts + (int64)std::floor(current_inc);
 	PFLOG2(2, " reduce limit increased to %lld conflicts by a weight %.2f", lrn.reduce_conf_max, current_inc);
 }
