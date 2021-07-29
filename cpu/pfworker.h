@@ -36,23 +36,25 @@ namespace pFROST {
 		mutable std::condition_variable		_poolCV;
 		bool								_terminate;
 		unsigned int						_waiting;
-		unsigned int						_max_batch;
+		unsigned int						_maxBatch;
 
 	public:
-		inline void init(unsigned int threads, unsigned int max_batch)
+		inline void init(unsigned int threads, unsigned int maxBatch)
 		{
 			_workers.clear();
 			_jobQueue.clear();
 			_terminate = false;
 			_waiting = 0;
-			_max_batch = max_batch;
+			_maxBatch = maxBatch;
 			if (threads == 0) threads = 1;
 
 			for (unsigned int i = 0; i < threads; i++) {
 				_workers.push_back(std::thread([this] {
 					while (true) {
 						std::unique_lock<std::mutex> lock(_mutex);
-						std::function<bool()> condition = [this] { return !_jobQueue.empty() || _terminate; };
+						std::function<bool()> condition = [this] {
+							return !_jobQueue.empty() || _terminate;
+						};
 						if (!condition()) {
 							_waiting++;
 							_poolCV.notify_one();
@@ -125,12 +127,14 @@ namespace pFROST {
 		template<class IntType, class Function>
 		inline void doWorkForEach(const IntType& begin, const IntType& end, const Function& job)
 		{
-			doWorkForEach(begin, end, (IntType)_max_batch, job);
+			doWorkForEach(begin, end, (IntType)_maxBatch, job);
 		}
 
 		inline void join() const {
 			std::unique_lock<std::mutex> lock(_mutex);
-			_poolCV.wait(lock, [this] { return _jobQueue.empty() && _waiting == _workers.size(); });
+			_poolCV.wait(lock, [this] {
+				return _jobQueue.empty() && _waiting == _workers.size();
+			});
 		}
 
 		inline int getID() const {
