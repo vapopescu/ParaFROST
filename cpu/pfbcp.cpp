@@ -32,7 +32,7 @@ bool ParaFROST::BCP()
 		PFLBCPS(this, 4, assign);
 		WL& ws = wt[assign];
 		if (ws.size()) {
-			WATCH* i = ws, *j = i, *wend = ws.end();
+			WATCH* i = ws, * j = i, * wend = ws.end();
 			while (i != wend) {
 				const WATCH& w = *j++ = *i++;
 				uint32 imp = w.imp;
@@ -43,16 +43,13 @@ bool ParaFROST::BCP()
 				//=============== binary ================//
 				if (w.binary()) {
 					C_REF r = w.ref;
-					if (cm[r].deleted()) { j--; continue; } 
-					if (!impVal) { 
-						conflict = r;
-						noConflict = false; 
-						break;
-					}
+					if (cm[r].deleted()) { j--; continue; }
+					if (!impVal) { conflict = r, noConflict = false; }
 					else enqueue(imp, assign_dl, r);
 				}
 				//================ large =================//
 				else {
+					if (!noConflict) break; // binary conflict found
 					C_REF r = w.ref;
 					CLAUSE& c = cm[r];
 					if (c.deleted()) { j--; continue; }
@@ -60,13 +57,13 @@ bool ParaFROST::BCP()
 					uint32 other = c[0] ^ c[1] ^ f_assign; // Thanks to Cadical solver
 					// check if first literal is true
 					LIT_ST otherVal = value(other);
-					if (otherVal > 0) 
+					if (otherVal > 0)
 						(j - 1)->imp = other; // satisfied, replace "w.imp" with new blocking "other"
 					else {
 						// === search for (un)-assigned-1 literal to watch
-						uint32* cmid = c.mid(), *cend = c.end();
+						uint32* cmid = c.mid(), * cend = c.end();
 						uint32* k = cmid, newlit = 0;
-						LIT_ST _false_ = UNDEFINED; 
+						LIT_ST _false_ = UNDEFINED;
 						while (k != cend && (_false_ = isFalse(newlit = *k))) k++;
 						assert(_false_ != UNDEFINED);
 						if (_false_) {
@@ -78,10 +75,10 @@ bool ParaFROST::BCP()
 						c.set_pos(int(k - c)); // set new position
 						// ======== end of search ========
 						LIT_ST val = value(newlit);
-						if (val > 0) { 
+						if (val > 0) {
 							// found satisfied new literal (keep the watch & replace "imp")
 							(j - 1)->imp = newlit;
-						} 
+						}
 						else if (UNASSIGNED(val)) {
 							// found new unassigned literal to watch
 							c[0] = other;
@@ -97,7 +94,7 @@ bool ParaFROST::BCP()
 							if (opts.chrono_en) {
 								int otherLevel = l2dl(other);
 								if (otherLevel > assign_dl) {
-									uint32* maxPos, *e = c.end(), maxLit = 0;
+									uint32* maxPos, * e = c.end(), maxLit = 0;
 									for (maxPos = c + 2; maxPos != e; maxPos++)
 										if (l2dl(maxLit = *maxPos) == otherLevel)
 											break;
@@ -116,12 +113,11 @@ bool ParaFROST::BCP()
 							assert(!val);
 							assert(!otherVal);
 							PFLCONFLICT(this, 3, other);
-							conflict = r;
-							noConflict = false;
+							conflict = r, noConflict = false;
 							break;
 						}
 					}
-				} 
+				}
 			} // end of watches loop 
 			if (j != i) {
 				while (i != wend) *j++ = *i++;

@@ -24,7 +24,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfvec.h"
 #include <cassert>
 #include <string>
-#include <mutex>
 
 namespace pFROST {
 
