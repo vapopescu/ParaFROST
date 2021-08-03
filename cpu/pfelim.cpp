@@ -17,7 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 **********************************************************************************/
 
 #include "pfsimp.h"
-#include "scc_wrapper.h"
 
 using namespace pFROST;
 using namespace SIGmA;
@@ -38,7 +37,7 @@ int ParaFROST::prop(SCNF* bin_check)
 
 				while (sp->propagated == trail.size()) {
 					if (working == 0 || cnfstate == UNSAT) {
-						cv.notify_all(); 
+						cv.notify_all();
 						return;
 					}
 					else cv.wait(lock);
@@ -484,7 +483,7 @@ void ParaFROST::IGR()
 
 								for (int k = 0; k < c->size(); k++) {
 									if (propClosure.contains(c->lit(k))) { unitLit = 1; break; }
-									else if (!propClosure.contains(FLIP(c->lit(k)))) { 
+									else if (!propClosure.contains(FLIP(c->lit(k)))) {
 										if (unitLit <= 1) unitLit = c->lit(k);
 										else { unitLit = 1; break; };
 									}
@@ -645,7 +644,7 @@ void ParaFROST::BVE()
 		std::vector<SCNF> new_res(PVs.size());
 
 		workerPool.doWorkForEach((uint32)0, PVs.size(), (uint32)1, [&](uint32 i) {
-			uint32 v = PVs[i];
+			uint32& v = PVs[i];
 			assert(v);
 			assert(sp->vstate[v] == ACTIVE);
 
@@ -704,17 +703,17 @@ void ParaFROST::BVE()
 		});
 		workerPool.join();
 
-		uint32 resLit = 0;
+		uint32 resCount = 0;
 		for (uint32 i = 0; i < PVs.size(); i++) {
-			resLit += resolved[i].size();
+			resCount += resolved[i].size();
 		}
 
-		model.resolved.reserve(model.resolved.size() + resLit + 1);
+		model.resolved.reserve(model.resolved.size() + resCount + 1);
 		for (uint32 i = 0; i < PVs.size(); i++) {
 			for (uint32 j = 0; j < resolved[i].size(); j++) {
 				model.resolved.push(resolved[i][j]);
 			}
-			model.resolved.push(resLit);
+			model.resolved.push(resCount);
 
 			for (int j = 0; j < new_res[i].size(); j++) {
 				S_REF c = new_res[i][j];

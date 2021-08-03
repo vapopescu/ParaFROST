@@ -20,7 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define __SIMP_
 
 #include "pfsort.h"
-#include "pfsolve.h"
+#include "pfsolve.h" 
 #include "pfrange.h"
 #include "scc_wrapper.h"
 
@@ -654,7 +654,7 @@ namespace SIGmA {
 #if VE_DBG
 		const char* type = SIGN(dx) ? "AND" : "OR";
 #endif
-		OL& itarget = ot[dx]; 
+		OL& itarget = ot[dx];
 		find_fanin(dx, itarget, out_c, sig);
 		if (out_c.size() > 1) {
 			uint32 f_dx = FLIP(dx);
@@ -931,7 +931,7 @@ namespace SIGmA {
 			for (int k = 0; k < c->size(); k++) {
 				uint32 lit = c->lit(k);
 				OL& ol = ot[lit];
-				OL *candidates = nullptr;
+				OL* candidates = nullptr;
 
 				if (pfrost->opts.hla_en) {
 					candidates = new OL(ol);
@@ -945,7 +945,7 @@ namespace SIGmA {
 				}
 
 				if (k == 0) {
-					subsumed.copyFrom(*candidates); 
+					subsumed.copyFrom(*candidates);
 					if (!pfrost->opts.hla_en) {
 						int i = 0, n = 0;
 						while (i < subsumed.size()) {

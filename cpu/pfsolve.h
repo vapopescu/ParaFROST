@@ -625,14 +625,13 @@ namespace pFROST {
 		void	sigmify				();
 		bool	LCVE				();
 		int		prop				(SCNF* = nullptr);
-		void	bve					();
 		void	IGR					();
 		void	CE					();
 		void	BVE					();
 		void	HSE					();
 		void	ERE					();
 		void	BCE					();
-		void	sortOT				(bool);
+		void	sortOT				(const bool&);
 		void	reduceOT			();
 		void	reduceOL			(OL&);
 		void	extract				(const BCNF&);

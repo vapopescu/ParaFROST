@@ -80,7 +80,7 @@ void ParaFROST::reduceOT()
 	if (opts.profile_simp) timer.pstop(), timer.rot += timer.pcpuTime();
 }
 
-void ParaFROST::sortOT(bool partial)
+void ParaFROST::sortOT(const bool& partial)
 {
 	if (opts.profile_simp) timer.pstart();
 
@@ -119,7 +119,7 @@ void ParaFROST::extract(const BCNF& cnf)
 }
 
 void ParaFROST::awaken(const bool& strict)
-{ 
+{
 	assert(conflict == NOREF);
 	assert(cnfstate == UNSOLVED);
 	assert(sp->propagated == trail.size());
@@ -133,7 +133,10 @@ void ParaFROST::awaken(const bool& strict)
 	size_t ig_cap = inf.nDualVars * sizeof(IG);
 	size_t scnf_cap = numCls * sizeof(S_REF) + numLits * sizeof(uint32);
 	if (!checkMem("ot", ot_cap) || !checkMem("ig", ig_cap) || !checkMem("scnf", scnf_cap))
-	{ sigState = SALLOC_FAIL; return; }
+	{
+		sigState = SALLOC_FAIL;
+		return;
+	}
 	ot.resize(inf.nDualVars), ig.resize(inf.nDualVars), scnf.resize(numCls);
 	PFLENDING(2, 5, "(%.1f MB used)", double(ot_cap + scnf_cap) / MBYTE);
 	// append clauses to scnf
@@ -203,28 +206,26 @@ void ParaFROST::sigmify()
 		/********************************/
 		/*          Write Back          */
 		/********************************/
-		if (cnfstate != UNSAT) {
-			assert(sp->propagated == trail.size());
-			if (interrupted()) killSolver();
-			occurs.clear(true), ot.clear(true), ig.clear(true);
-			countFinal();
-			shrinkSimp(), assert(inf.nClauses == scnf.size());
-			stats.sigmifications++;
-			lrn.elim_lastmarked = lrn.elim_marked;
-			if (opts.aggr_cnf_sort) std::stable_sort(scnf.data(), scnf.data() + scnf.size(), CNF_CMP_KEY());
-			if (inf.maxFrozen > sp->simplified) stats.n_forced += inf.maxFrozen - sp->simplified;
-			if (satisfied() || !inf.nClauses)
-				cnfstate = SAT, printStats(1, 'p', CGREEN);
-			else {
-				if (maxInactive() > opts.map_min) map(true);
-				else assert(!mapped), newBeginning();
-				sigmaDelay();
-			}
+		assert(sp->propagated == trail.size());
+		if (interrupted()) killSolver();
+		occurs.clear(true), ot.clear(true), ig.clear(true);
+		countFinal();
+		shrinkSimp(), assert(inf.nClauses == scnf.size());
+		stats.sigmifications++;
+		lrn.elim_lastmarked = lrn.elim_marked;
+		if (opts.aggr_cnf_sort) std::stable_sort(scnf.data(), scnf.data() + scnf.size(), CNF_CMP_KEY());
+		if (inf.maxFrozen > sp->simplified) stats.n_forced += inf.maxFrozen - sp->simplified;
+		if (satisfied() || !inf.nClauses)
+			cnfstate = SAT, printStats(1, 'p', CGREEN);
+		else {
+			if (maxInactive() > opts.map_min) map(true);
+			else assert(!mapped), newBeginning();
+			sigmaDelay();
 		}
 	}
-
 	timer.stop(), timer.simp += timer.cpuTime();
 	if (!opts.solve_en) killSolver();
+	if (interrupted()) killSolver();
 	timer.start();
 }
 
