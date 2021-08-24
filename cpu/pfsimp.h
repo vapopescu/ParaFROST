@@ -1033,7 +1033,7 @@ namespace SIGmA {
 		ig[FLIP(lit2)].lock(); ig[FLIP(lit2)].deleteChild(lit1); ig[FLIP(lit2)].unlock();
 	}
 
-	inline bool clause_replace(const S_REF& c, const uint32& oldLit, const uint32& newLit, IG& ig)
+	inline bool clause_replace(const S_REF& c, const uint32& oldLit, const uint32& newLit, IG& ig, OL& newUnit)
 	{
 		// Replace literals avoiding duplication.
 		uint32 n = 0;
@@ -1065,8 +1065,11 @@ namespace SIGmA {
 		c->set_sig(sig);
 
 		// Update IG 
-		bool newEdge = false;
-		if (c->size() == 2) {
+		if (c->size() > 2) {
+			return false;
+		}
+		else if (c->size() == 2) {
+			bool newEdge = false;
 			uint32 otherLit = 0;
 			if (c->lit(1) == newLit) otherLit = c->lit(0);
 			else otherLit = c->lit(1);
@@ -1075,11 +1078,18 @@ namespace SIGmA {
 			else newEdge = true;
 
 			insert_ig_edge(c, ig);
+			return newEdge;
 		}
-		return newEdge;
+		else if (c->size() == 1) {
+			newUnit.push(c);
+			return false;
+		}
+
+		assert(false);
+		return false;
 	}
 
-	inline bool node_reduce(const uint32& oldLit, const uint32& newLit, OT& ot, IG& ig)
+	inline bool node_reduce(const uint32& oldLit, const uint32& newLit, OT& ot, IG& ig, OL& newUnit)
 	{
 		bool newEdge = false;
 		ig[oldLit].lockRead();
@@ -1093,7 +1103,7 @@ namespace SIGmA {
 					S_REF& c = ot[oldLit][i];
 
 					c->lock();
-					newEdge = clause_replace(c, oldLit, newLit, ig);
+					newEdge = clause_replace(c, oldLit, newLit, ig, newUnit);
 					c->unlock();
 
 					ot[newLit].lock(); ot[newLit].push(c); ot[newLit].unlock();

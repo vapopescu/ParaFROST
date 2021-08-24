@@ -203,6 +203,8 @@ void ParaFROST::sigmify()
 			phase++, mu_inc++;
 			mu_inc += phase == opts.phases;
 		}
+	}
+	if (cnfstate != UNSAT) {
 		/********************************/
 		/*          Write Back          */
 		/********************************/

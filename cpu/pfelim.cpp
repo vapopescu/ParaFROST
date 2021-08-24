@@ -126,6 +126,7 @@ void ParaFROST::IGR()
 		sccWrapper.setNumThreads(opts.worker_count);
 		sccWrapper.setMethod(SCC_UFSCC);
 		sccWrapper.setGraph(ig);
+
 		bool done = false;
 		int hbrRetries = opts.hbr_max > 0 ? opts.hbr_max : -1;
 
@@ -155,6 +156,7 @@ void ParaFROST::IGR()
 			uVec1D resetQueue;
 			resetQueue.reserve(inf.nDualVars);
 			bool sccScan = true;
+			std::atomic<bool> sccReset = false;
 
 			if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[3] += timer.pcpuTime();
 
@@ -177,15 +179,32 @@ void ParaFROST::IGR()
 				// Replace each node with its SCC representative.
 				workerPool.doWorkForEach((uint32)1, inf.maxVar, [&](uint32 v) {
 					const uint32 lit = V2L(v);
-					const uint32& repLit = scc[lit];
+					const uint32 repLit = scc[lit];
+
+					assert(repLit > 1);
+					assert(repLit < inf.nDualVars);
 
 					if (lit == repLit) sccCount++;
 					else {
 						bool n = false;
-						n |= node_reduce(lit, repLit, ot, ig);
-						n |= node_reduce(FLIP(lit), FLIP(repLit), ot, ig);
+						OL newUnit;
+
+						n |= node_reduce(lit, repLit, ot, ig, newUnit);
+						n |= node_reduce(FLIP(lit), FLIP(repLit), ot, ig, newUnit);
 						if (n) newEdge = true;
-						sp->vstate[v] = MELTED, v = 0;
+						//sp->vstate[v] = MELTED;
+
+						for (int i = 0; i < newUnit.size(); i++) {
+							uint32 unit = newUnit[i]->lit(0);
+
+							propagateMutex.lock();
+							if (unassigned(unit)) enqueueOrg(unit);
+							else cnfstate = UNSAT;
+							propagateMutex.unlock();
+
+							sccReset = true;
+						}
+						newUnit.clear(true);
 
 						resetQueue.lock();
 						resetQueue.push(lit);
@@ -195,10 +214,12 @@ void ParaFROST::IGR()
 				workerPool.join();
 
 				delete[] scc;
-				if (!newEdge) sccScan = false;
+				if (!newEdge || sccReset) sccScan = false;
 
 				if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[5] += timer.pcpuTime();
 			}
+
+			if (sccReset) { continue; }
 
 			if (opts.profile_simp) timer.pstart();
 
@@ -421,7 +442,7 @@ void ParaFROST::IGR()
 									uVec1D& units = ig[flipLit].descendants();
 									for (uint32 j = 0; j < units.size(); j++) {
 										if (unassigned(units[j])) enqueueOrg(units[j]);
-										else { cnfstate = UNSAT; exploreCV.notify_all(); }
+										//else { cnfstate = UNSAT; exploreCV.notify_all(); }
 									}
 								}
 
@@ -429,12 +450,12 @@ void ParaFROST::IGR()
 									Vec<Edge>& units = ig[flipLit].children();
 									for (uint32 j = 0; j < units.size(); j++) {
 										if (unassigned(units[j].first)) enqueueOrg(units[j].first);
-										else { cnfstate = UNSAT; exploreCV.notify_all(); }
+										//else { cnfstate = UNSAT; exploreCV.notify_all(); }
 									}
 								}
 
 								if (unassigned(flipLit)) enqueueOrg(flipLit);
-								else { cnfstate = UNSAT; exploreCV.notify_all(); }
+								//else { cnfstate = UNSAT; exploreCV.notify_all(); }
 
 								propagateMutex.unlock();
 								ig[flipLit].unlockRead();
@@ -563,7 +584,7 @@ void ParaFROST::IGR()
 			for (uint32 i = 0; i < newClauses.size(); i++) {
 				for (uint32 j = 0; j < newClauses[i].size(); j++) {
 					S_REF& c = newClauses[i][j];
-					newResolvent(c);
+					newBinary(c);
 					insert_ig_edge(c, ig);
 					ot[c->lit(0)].push(c);
 					ot[c->lit(1)].push(c);
