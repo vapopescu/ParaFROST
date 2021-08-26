@@ -70,7 +70,7 @@ int ParaFROST::prop(SCNF* bin_check)
 				if (c->size() == 1) {
 					assert(**c > 1);
 					std::unique_lock<std::mutex> lock(m);
-					if (unassigned(**c)) {
+					if (!isFalse(**c)) {
 						enqueueOrg(**c);
 						cv.notify_one();
 					}
@@ -441,21 +441,21 @@ void ParaFROST::IGR()
 								if (cnfstate == UNSOLVED) {
 									uVec1D& units = ig[flipLit].descendants();
 									for (uint32 j = 0; j < units.size(); j++) {
-										if (unassigned(units[j])) enqueueOrg(units[j]);
-										//else { cnfstate = UNSAT; exploreCV.notify_all(); }
+										if (!isFalse(units[j])) enqueueOrg(units[j]);
+										else { cnfstate = UNSAT; exploreCV.notify_all(); }
 									}
 								}
 
 								if (cnfstate == UNSOLVED) {
 									Vec<Edge>& units = ig[flipLit].children();
 									for (uint32 j = 0; j < units.size(); j++) {
-										if (unassigned(units[j].first)) enqueueOrg(units[j].first);
-										//else { cnfstate = UNSAT; exploreCV.notify_all(); }
+										if (!isFalse(units[j].first)) enqueueOrg(units[j].first);
+										else { cnfstate = UNSAT; exploreCV.notify_all(); }
 									}
 								}
 
-								if (unassigned(flipLit)) enqueueOrg(flipLit);
-								//else { cnfstate = UNSAT; exploreCV.notify_all(); }
+								if (!isFalse(flipLit)) enqueueOrg(flipLit);
+								else { cnfstate = UNSAT; exploreCV.notify_all(); }
 
 								propagateMutex.unlock();
 								ig[flipLit].unlockRead();

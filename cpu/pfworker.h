@@ -102,7 +102,7 @@ namespace pFROST {
 		template<class IntType, class Function>
 		inline void doWorkForEach(const IntType& begin, const IntType& end, const IntType& maxBatch, const Function& job)
 		{
-			std::unique_lock<std::mutex> lock(_mutex);
+			std::unique_lock lock(_mutex);
 			IntType idx = begin;
 			IntType batchSize = (end - begin) / (IntType)_workers.size();
 			IntType remainder = (end - begin) % (IntType)_workers.size();
