@@ -70,11 +70,11 @@ int ParaFROST::prop(SCNF* bin_check)
 				if (c->size() == 1) {
 					assert(**c > 1);
 					std::unique_lock<std::mutex> lock(m);
-					if (!isFalse(**c)) {
+					if (unassigned(**c)) {
 						enqueueOrg(**c);
 						cv.notify_one();
 					}
-					else {
+					else if (isFalse(**c)) {
 						cnfstate = UNSAT;
 						c->unlock();
 						break;
@@ -199,7 +199,7 @@ void ParaFROST::IGR()
 
 							propagateMutex.lock();
 							if (unassigned(unit)) enqueueOrg(unit);
-							else cnfstate = UNSAT;
+							else if (isFalse(unit)) cnfstate = UNSAT;
 							propagateMutex.unlock();
 
 							sccReset = true;
@@ -441,21 +441,21 @@ void ParaFROST::IGR()
 								if (cnfstate == UNSOLVED) {
 									uVec1D& units = ig[flipLit].descendants();
 									for (uint32 j = 0; j < units.size(); j++) {
-										if (!isFalse(units[j])) enqueueOrg(units[j]);
-										else { cnfstate = UNSAT; exploreCV.notify_all(); }
+										if (unassigned(units[j])) enqueueOrg(units[j]);
+										else if (isFalse(units[j])) { cnfstate = UNSAT; exploreCV.notify_all(); }
 									}
 								}
 
 								if (cnfstate == UNSOLVED) {
 									Vec<Edge>& units = ig[flipLit].children();
 									for (uint32 j = 0; j < units.size(); j++) {
-										if (!isFalse(units[j].first)) enqueueOrg(units[j].first);
-										else { cnfstate = UNSAT; exploreCV.notify_all(); }
+										if (unassigned(units[j].first)) enqueueOrg(units[j].first);
+										else if (isFalse(units[j].first)) { cnfstate = UNSAT; exploreCV.notify_all(); }
 									}
 								}
 
-								if (!isFalse(flipLit)) enqueueOrg(flipLit);
-								else { cnfstate = UNSAT; exploreCV.notify_all(); }
+								if (unassigned(flipLit)) enqueueOrg(flipLit);
+								else if (isFalse(flipLit)) { cnfstate = UNSAT; exploreCV.notify_all(); }
 
 								propagateMutex.unlock();
 								ig[flipLit].unlockRead();
@@ -514,7 +514,7 @@ void ParaFROST::IGR()
 									// conflict => failed literal
 									propagateMutex.lock();
 									if (unassigned(flipLit)) enqueueOrg(flipLit);
-									else { cnfstate = UNSAT; exploreCV.notify_all(); }
+									else if (isFalse(flipLit)) { cnfstate = UNSAT; exploreCV.notify_all(); }
 									propagateMutex.unlock();
 									failed = true;
 									break;
