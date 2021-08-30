@@ -398,7 +398,7 @@ void ParaFROST::IGR()
 							bool redundant = false;
 
 							// Remove redundant edges.
-							for (uint32 j = 0; j < ds.size(); j++) {
+							/*for (uint32 j = 0; j < ds.size(); j++) {
 								if (ds[j] < c) continue;
 								else if (ds[j] == c) {
 									cs[i].second->markDeleted();
@@ -406,7 +406,7 @@ void ParaFROST::IGR()
 									break;
 								}
 								else break;
-							}
+							}*/
 
 							// Gather descendants.
 							if (!redundant) {
