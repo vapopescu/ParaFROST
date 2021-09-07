@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "pfcontrol.h"
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -77,6 +78,7 @@ namespace pFROST {
 			if (_terminate) return;
 			_terminate = true;
 			_workerCV.notify_all();
+			_poolCV.notify_one();
 
 			for (auto& w : _workers) {
 				w.join();
@@ -133,8 +135,10 @@ namespace pFROST {
 		inline void join() const {
 			std::unique_lock<std::mutex> lock(_mutex);
 			_poolCV.wait(lock, [this] {
-				return _jobQueue.empty() && _waiting == _workers.size();
+				return (_jobQueue.empty() && _waiting == _workers.size()) || _terminate;
 			});
+
+			if (_terminate) throw InterruptException();
 		}
 
 		inline int getID() const {

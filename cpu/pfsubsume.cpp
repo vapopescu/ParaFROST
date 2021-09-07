@@ -178,7 +178,7 @@ void ParaFROST::schedule(BCNF& src)
 
 bool ParaFROST::subsumeAll()
 {
-	if (interrupted()) killSolver();
+	if (interrupted()) throw InterruptException();
 	assert(!DL());
 	assert(!satisfied());
 	assert(conflict == NOREF);

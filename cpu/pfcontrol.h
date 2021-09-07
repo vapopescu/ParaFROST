@@ -22,18 +22,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "pfdefs.h"
 #include "pfdimacs.h"
 #include "pfdtypes.h"
+#include <exception>
 
 namespace pFROST {
 
 	int64	sysMemUsed();
 	int64	getAvailSysMem();
 	void	getCPUInfo();
-	void	signal_handler(void h_intr(int), void h_timeout(int) = NULL);
+	void	signal_handler(void h_intr(int));
 	void	set_timeout(int);
 	void	handler_terminate(int);
 	void	handler_mercy_interrupt(int);
 	void	handler_mercy_timeout(int);
 
+	class	InterruptException : std::exception {};
 }
 
 #endif 

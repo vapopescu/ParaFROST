@@ -17,6 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 **********************************************************************************/
 
 #include "pfsolve.h"
+#include <future>
+#include <chrono>
+#include <csignal>
 
 using namespace pFROST;
 
@@ -57,8 +60,23 @@ int main(int argc, char **argv)
 		signal_handler(handler_terminate);
 		ParaFROST* pFrost = new ParaFROST(formula);
 		pfrost = pFrost;
-		signal_handler(handler_mercy_interrupt, handler_mercy_timeout);
-		pFrost->solve();
+		signal_handler(handler_mercy_interrupt);
+
+		if (opt_timeout > 0) {
+			std::future<void> future = std::async(std::launch::async, [&pFrost] {
+				pFrost->solve();
+			});
+			std::future_status status = future.wait_for(std::chrono::seconds(opt_timeout));
+
+			if (status == std::future_status::timeout) {
+				std::raise(SIGINT);
+				pFrost->workerPool.destroy(); // abort work
+			}
+		}
+		else {
+			pFrost->solve();
+		}
+
 		if (!quiet_en) PFLOG0("");
 		PFLOGN2(1, " Cleaning up..");
 		pfrost = NULL;

@@ -86,24 +86,10 @@ namespace pFROST {
 		pfrost->interrupt();
 	}
 
-	void handler_mercy_timeout(int)
-	{
-		fflush(stdout);
-		if (!quiet_en) {
-			PFLOG0("");
-			PFLOG1("%s%45s%s", CYELLOW, "Timeout", CNORMAL);
-			PFLOG0("");
-		}
-		pfrost->interrupt();
-	}
-
-	void signal_handler(void h_intr(int), void h_timeout(int))
+	void signal_handler(void h_intr(int))
 	{
 		signal(SIGINT, h_intr);
 		signal(SIGTERM, h_intr);
-#ifdef SIGXCPU
-		if (h_timeout != NULL) signal(SIGXCPU, h_timeout);
-#endif
 	}
 
 	void getCPUInfo()

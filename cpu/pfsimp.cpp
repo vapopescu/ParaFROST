@@ -209,7 +209,7 @@ void ParaFROST::sigmify()
 		/*          Write Back          */
 		/********************************/
 		assert(sp->propagated == trail.size());
-		if (interrupted()) killSolver();
+		if (interrupted()) throw InterruptException();
 		occurs.clear(true), ot.clear(true), ig.clear(true);
 		countFinal();
 		shrinkSimp(), assert(inf.nClauses == scnf.size());
@@ -225,9 +225,10 @@ void ParaFROST::sigmify()
 			sigmaDelay();
 		}
 	}
+	if (interrupted()) throw InterruptException();
 	timer.stop(), timer.simp += timer.cpuTime();
+
 	if (!opts.solve_en) killSolver();
-	if (interrupted()) killSolver();
 	timer.start();
 }
 

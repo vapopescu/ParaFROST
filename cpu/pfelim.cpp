@@ -104,7 +104,7 @@ int ParaFROST::prop(SCNF* bin_check)
 void ParaFROST::IGR()
 {
 	if (phase == 0 && opts.igr_en) {
-		if (interrupted()) killSolver();
+		if (interrupted()) throw InterruptException();
 		PFLOGN2(2, " Reasoning on the implication graph..");
 		if (opts.profile_simp) timer.pstart();
 
@@ -639,7 +639,7 @@ void ParaFROST::IGR()
 void ParaFROST::CE()
 {
 	if (phase == 0 && opts.ce_en && (opts.hse_en || opts.bce_en)) {
-		if (interrupted()) killSolver();
+		if (interrupted()) throw InterruptException();
 		PFLOGN2(2, "  Eliminating clauses..");
 		if (opts.profile_simp) timer.pstart();
 
@@ -657,7 +657,7 @@ void ParaFROST::CE()
 void ParaFROST::BVE()
 {
 	if (opts.ve_en) {
-		if (interrupted()) killSolver();
+		if (interrupted()) throw InterruptException();
 		PFLOGN2(2, "  Eliminating variables..");
 		if (opts.profile_simp) timer.pstart();
 
@@ -754,7 +754,7 @@ void ParaFROST::BVE()
 void ParaFROST::HSE()
 {
 	if (!opts.ce_en && (opts.hse_en || opts.ve_plus_en)) {
-		if (interrupted()) killSolver();
+		if (interrupted()) throw InterruptException();
 		PFLOGN2(2, "  Eliminating (self)-subsumptions..");
 		if (opts.profile_simp) timer.pstart();
 
@@ -777,7 +777,7 @@ void ParaFROST::HSE()
 void ParaFROST::BCE()
 {
 	if (!opts.ce_en && opts.bce_en) {
-		if (interrupted()) killSolver();
+		if (interrupted()) throw InterruptException();
 		PFLOGN2(2, " Eliminating blocked clauses..");
 		if (opts.profile_simp) timer.pstart();
 
@@ -799,7 +799,7 @@ void ParaFROST::BCE()
 void ParaFROST::ERE()
 {
 	if (!opts.ere_en) return;
-	if (interrupted()) killSolver();
+	if (interrupted()) throw InterruptException();
 	PFLOGN2(2, " Eliminating redundances..");
 	if (opts.profile_simp) timer.pstart();
 

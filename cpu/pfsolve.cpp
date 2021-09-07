@@ -48,7 +48,6 @@ ParaFROST::ParaFROST(const string& _path) :
 	if (!parser() || BCP()) { cnfstate = UNSAT, killSolver(); }
 	if (opts.parse_only_en) killSolver();
 	if (verbose == 1) printTable();
-	if (opts.timeout > 0) timer.setTimeout(opts.timeout);
 }
 
 bool ParaFROST::parser() {
@@ -181,24 +180,27 @@ void ParaFROST::resetSolver() {
 void ParaFROST::solve()
 {
 	timer.start();
-	if (canPreSigmify()) sigmify();
-	PFLOG2(2, "-- CDCL search started..");
-	if (cnfstate == UNSOLVED) MDMInit();
-	while (cnfstate == UNSOLVED) {
-		if (opts.timeout > 0 && timer.checkTimeout()) handler_mercy_timeout(0);
-		if (interrupted()) break;
-		PFLDL(this, 3);
-		if (BCP()) analyze();
-		else if (satisfied()) cnfstate = SAT;
-		else if (canRestart()) restart();
-		else if (canRephase()) rephase();
-		else if (canReduce()) reduce();
-		else if (canSubsume()) subsume();
-		else if (canSigmify()) sigmify();
-		else if (canMMD()) MDM();
-		else decide();
-		PFLTRAIL(this, 3);
+	try {
+		if (canPreSigmify()) sigmify();
+		PFLOG2(2, "-- CDCL search started..");
+		if (cnfstate == UNSOLVED) MDMInit();
+		while (cnfstate == UNSOLVED) {
+			if (interrupted()) break;
+			PFLDL(this, 3);
+			if (BCP()) analyze();
+			else if (satisfied()) cnfstate = SAT;
+			else if (canRestart()) restart();
+			else if (canRephase()) rephase();
+			else if (canReduce()) reduce();
+			else if (canSubsume()) subsume();
+			else if (canSigmify()) sigmify();
+			else if (canMMD()) MDM();
+			else decide();
+			PFLTRAIL(this, 3);
+		}
 	}
+	catch (InterruptException e) {}
+
 	timer.stop(), timer.solve += timer.cpuTime();
 	if (!interrupted()) PFLOG2(2, "-- CDCL search completed successfully");
 	wrapup();

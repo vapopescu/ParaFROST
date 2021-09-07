@@ -73,7 +73,6 @@ BOOL_OPT opt_chronoreuse_en("chronoreusetrail", "enable reuse trail when chronol
 BOOL_OPT opt_model_en("model", "print model on stdout", false);
 BOOL_OPT opt_proof_en("proof", "generate proof in binary DRAT format", false);
 BOOL_OPT opt_priorbins_en("priorbins", "prioritize binaries in watch table", true);
-INT_OPT opt_timeout("timeout", "set the timeout in seconds", 0, INT32R(0, INT32_MAX));
 INT_OPT opt_progress("progressrate", "progress rate to print search statistics", 15000, INT32R(1, INT32_MAX));
 INT_OPT opt_seed("seed", "seed value for random generation", 0, INT32R(0, INT32_MAX));
 INT_OPT opt_mdm_vsidspumps("mdmvsidspumps", "set the number of followup decision pumps using VSIDS activity", 1, INT32R(0, INT32_MAX));
@@ -173,7 +172,6 @@ void OPTION::init() {
 	subsume_max_checks = opt_subsume_max_checks;
 	subsume_max_csize = opt_subsume_max_csize;
 	seed = opt_seed;
-	timeout = opt_timeout;
 	lbd_tier1 = opt_lbd_tier1;
 	lbd_tier2 = opt_lbd_tier2;
 	lbd_fast = opt_lbd_fast;
