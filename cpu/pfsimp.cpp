@@ -89,6 +89,7 @@ void ParaFROST::sortOT(const bool& partial)
 			assert(v);
 			uint32 p = V2L(v), n = NEG(p);
 			OL& poss = ot[p], & negs = ot[n];
+			reduceOL(poss); reduceOL(negs);
 			std::sort(poss.data(), poss.data() + poss.size(), CNF_CMP_ABS());
 			std::sort(negs.data(), negs.data() + negs.size(), CNF_CMP_ABS());
 		});
@@ -100,6 +101,7 @@ void ParaFROST::sortOT(const bool& partial)
 			assert(v);
 			uint32 p = V2L(v), n = NEG(p);
 			OL& poss = ot[p], & negs = ot[n];
+			reduceOL(poss); reduceOL(negs);
 			std::sort(poss.data(), poss.data() + poss.size(), CNF_CMP_KEY());
 			std::sort(negs.data(), negs.data() + negs.size(), CNF_CMP_KEY());
 		});

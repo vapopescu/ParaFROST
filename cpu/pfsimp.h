@@ -924,9 +924,10 @@ namespace SIGmA {
 	inline void clause_elim(S_REF& c, OT& ot, IG& ig)
 	{
 		// RSE
-		if (pfrost->opts.hse_en && !c->deleted() && c->size() <= pfrost->opts.rse_max) {
+		if (pfrost->opts.rse_en && !c->deleted() && c->size() <= pfrost->opts.rse_max) {
 			CNF_CMP_ABS less;
 			OL subsumed;
+			subsumed.reserve(INIT_CAP);
 
 			for (int k = 0; k < c->size(); k++) {
 				uint32 lit = c->lit(k);
@@ -934,10 +935,20 @@ namespace SIGmA {
 				OL* candidates = nullptr;
 
 				if (pfrost->opts.hla_en) {
-					candidates = new OL(ol);
+					candidates = new OL();
+					candidates->copyFrom(ol);
+
 					for (uint32 i = 0; i < ig[lit].descendants().size(); i++) {
 						uint32 aug = ig[lit].descendants()[i];
-						candidates->unionize(ot[aug]);
+						if (subsumed.size() > 0) {
+							OL augOl;
+							augOl.copyFrom(subsumed);
+							augOl.intersect(ot[aug]);
+							candidates->unionize(augOl);
+						}
+						else {
+							candidates->unionize(ot[aug]);
+						}
 					}
 				}
 				else {
@@ -982,7 +993,6 @@ namespace SIGmA {
 					if (d->tryLock()) {
 						if (!d->deleted()) {
 							if (d->original()) promote = true;
-							assert(!subset(c, d));
 							if (c->size() < d->size()) d->markDeleted();
 						}
 						d->unlock();
@@ -991,6 +1001,14 @@ namespace SIGmA {
 			}
 			if (promote) c->set_status(ORIGINAL);
 			c->unlock();
+		}
+
+		// HSE
+		if (pfrost->opts.hse_en && !pfrost->opts.rse_en && !c->deleted() && c->size() > 2 && c->size() <= HSE_MAX_CL_SIZE) {
+			for (int k = 0; k < c->size() && !c->deleted(); k++) {
+				OL& ol = ot[c->lit(k)];
+				if (ol.size() <= pfrost->opts.hse_limit) sub_x(c, ol);
+			}
 		}
 
 		// BCE

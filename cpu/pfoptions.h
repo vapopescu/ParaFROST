@@ -87,6 +87,7 @@ namespace pFROST {
 		bool	fle_en;
 		bool	hbr_en;
 		bool	hla_en;
+		bool	rse_en;
 		bool	ce_en;
 		bool	all_en;
 		bool	solve_en;

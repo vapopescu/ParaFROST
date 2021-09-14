@@ -111,7 +111,7 @@ void ParaFROST::IGR()
 		// Initialize IG based on original binary clauses.
 		workerPool.doWorkForEach((size_t)0, scnf.size(), [this](size_t i) {
 			S_REF c = scnf[i];
-			if (c->size() == 2 /*&& c->original()*/ && !c->deleted()) append_ig_edge(c, ig);
+			if (c->size() == 2 && c->original() && !c->deleted()) append_ig_edge(c, ig);
 		});
 		workerPool.join();
 
@@ -659,6 +659,8 @@ void ParaFROST::CE()
 			clause_elim(scnf[i], ot, ig);
 		});
 		workerPool.join();
+
+		reduceOT();
 
 		if (opts.profile_simp) timer.pstop(), timer.ce += timer.pcpuTime();
 		PFLDONE(2, 5);

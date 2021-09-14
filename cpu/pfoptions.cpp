@@ -32,6 +32,7 @@ BOOL_OPT opt_fle_en("fle", "enable failed literal elimination", true);
 BOOL_OPT opt_hbr_en("hbr", "enable hyper-binary-resolution", false);
 BOOL_OPT opt_hla_en("hla", "enable hidden literal addition", true);
 BOOL_OPT opt_ce_en("ce", "enable clause elimination stage", false);
+BOOL_OPT opt_rse_en("rse", "replace hybrid subsumption elimination with resverse subsumption elimination in the clause elimination stage", false);
 BOOL_OPT opt_all_en("all", "enable all simplifications", false);
 BOOL_OPT opt_profile_simp_en("profilesimp", "profile simplifications", false);
 BOOL_OPT opt_aggr_cnf_sort("aggresivesort", "sort simplified formula with aggresive key before writing to host", false);
@@ -194,6 +195,7 @@ void OPTION::init() {
 		fle_en = opt_fle_en && opt_igr_en;
 		hbr_en = opt_hbr_en && opt_igr_en;
 		bce_en = opt_bce_en;
+		rse_en = opt_rse_en;
 		ere_en = opt_ere_en;
 		all_en = opt_all_en;
 		phases = opt_phases;
