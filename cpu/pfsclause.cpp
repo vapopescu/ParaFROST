@@ -90,7 +90,9 @@ void ParaFROST::newBinary(S_REF s)
 	assert(s->hasZero() < 0);
 	assert(!s->status());
 	assert(s->isSorted());
-	s->set_status(LEARNT);
+	s->set_status(ORIGINAL);
+	//s->set_status(LEARNT);
+	//s->set_lbd(pfrost->calcLBD());
 	s->markAdded();
 	s->calcSig();
 	scnf.push(s);

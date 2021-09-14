@@ -63,19 +63,12 @@ int main(int argc, char **argv)
 		signal_handler(handler_mercy_interrupt);
 
 		if (opt_timeout > 0) {
-			std::future<void> future = std::async(std::launch::async, [&pFrost] {
-				pFrost->solve();
-			});
+			std::future<void> future = std::async(std::launch::async, [&pFrost] { pFrost->solve(); });
 			std::future_status status = future.wait_for(std::chrono::seconds(opt_timeout));
 
-			if (status == std::future_status::timeout) {
-				std::raise(SIGINT);
-				pFrost->workerPool.destroy(); // abort work
-			}
+			if (status == std::future_status::timeout) std::raise(SIGINT);
 		}
-		else {
-			pFrost->solve();
-		}
+		else pFrost->solve();
 
 		if (!quiet_en) PFLOG0("");
 		PFLOGN2(1, " Cleaning up..");

@@ -36,6 +36,7 @@ namespace pFROST {
 		mutable std::condition_variable		_workerCV;
 		mutable std::condition_variable		_poolCV;
 		bool								_terminate;
+		bool								_interrupted;
 		unsigned int						_waiting;
 		unsigned int						_maxBatch;
 
@@ -132,13 +133,18 @@ namespace pFROST {
 			doWorkForEach(begin, end, (IntType)_maxBatch, job);
 		}
 
-		inline void join() const {
-			std::unique_lock<std::mutex> lock(_mutex);
-			_poolCV.wait(lock, [this] {
-				return (_jobQueue.empty() && _waiting == _workers.size()) || _terminate;
-			});
+		inline void join() {
+			{
+				std::unique_lock<std::mutex> lock(_mutex);
+				_poolCV.wait(lock, [this] {
+					return (_jobQueue.empty() && _waiting == _workers.size()) || _interrupted;
+				});
+			}
 
-			if (_terminate) throw InterruptException();
+			if (_interrupted) { 
+				destroy();
+				throw InterruptException(); 
+			}
 		}
 
 		inline int getID() const {
@@ -150,5 +156,8 @@ namespace pFROST {
 
 			return -1;
 		}
+
+		inline void interrupt() { _interrupted = true; }
+		inline bool isInterrupted() const { return _interrupted; }
 	};
 }

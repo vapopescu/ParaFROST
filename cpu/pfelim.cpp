@@ -206,8 +206,11 @@ void ParaFROST::IGR()
 						}
 						newUnit.clear(true);
 
+						uVec1D toReset = { repLit, FLIP(repLit) };
+						std::sort(toReset.data(), toReset.data() + toReset.size());
+
 						resetQueue.lock();
-						resetQueue.push(lit);
+						resetQueue.unionize(toReset);
 						resetQueue.unlock();
 					}
 				});
@@ -334,7 +337,7 @@ void ParaFROST::IGR()
 				uint32 ti = workerPool.getID();
 				assert(ti >= 0);
 
-				while (cnfstate == UNSOLVED || !exploreTerminate) {
+				while (cnfstate == UNSOLVED) {
 					if (lit == 0) {
 						std::unique_lock lock(exploreMutex);
 						exploreWorking--;
@@ -348,7 +351,9 @@ void ParaFROST::IGR()
 							else exploreCV.wait(lock);
 						}
 
-						if (exploreTerminate) break;
+						if (workerPool.isInterrupted()) exploreTerminate = true;
+						if (cnfstate == UNSAT || exploreTerminate) break;
+
 						exploreWorking++;
 						lit = exploreQueue[exploreIdx++];
 					}
@@ -390,41 +395,47 @@ void ParaFROST::IGR()
 					// Cannot procede if not all children are explored.
 					if (!childrenExplored) { lit = 0; continue; }
 
+					// Gather descendants.
 					ig[lit].lock();
+					ig[lit].descendants().clear();
 					for (uint32 i = 0; i < cs.size(); i++) {
 						if (!cs[i].second->deleted()) {
 							uint32 c = cs[i].first;
 							ig[c].lockRead();
-							bool redundant = false;
 
-							// Remove redundant edges.
-							/*for (uint32 j = 0; j < ds.size(); j++) {
-								if (ds[j] < c) continue;
-								else if (ds[j] == c) {
-									cs[i].second->markDeleted();
-									redundant = true;
-									break;
+							uVec1D grandchildren;
+							auto& gcs = ig[c].children();
+							for (uint32 i = 0; i < gcs.size(); i++) {
+								if (!gcs[i].second->deleted()) {
+									grandchildren.push(gcs[i].first);
 								}
-								else break;
-							}*/
-
-							// Gather descendants.
-							if (!redundant) {
-								uVec1D grandchildren;
-								auto& gcs = ig[c].children();
-								for (uint32 i = 0; i < gcs.size(); i++) {
-									if (!gcs[i].second->deleted()) {
-										grandchildren.push(gcs[i].first);
-									}
-								}
-
-								ig[lit].descendants().unionize(grandchildren);
-								ig[lit].descendants().unionize(ig[c].descendants());
 							}
+
+							ig[lit].descendants().unionize(grandchildren);
+							ig[lit].descendants().unionize(ig[c].descendants());
 
 							ig[c].unlockRead();
 						}
 					}
+
+					// Remove redundant edges.
+					/*for (uint32 i = 0; i < cs.size(); i++) {
+						if (!cs[i].second->deleted()) {
+							uint32 c = cs[i].first;
+							ig[c].lock();
+
+							for (uint32 j = 0; j < ds.size(); j++) {
+								if (ds[j] < c) continue;
+								else if (ds[j] == c) {
+									cs[i].second->markDeleted();
+									break;
+								}
+								else break;
+							}
+
+							ig[c].unlock();
+						}
+					}*/
 
 					// Check if literal is failed.
 					bool failed = false;
@@ -525,13 +536,14 @@ void ParaFROST::IGR()
 									propClosure.unionize(uVec1D({ unitLit }));
 								}
 
+								if (workerPool.isInterrupted()) exploreTerminate = true;
 								if (exploreTerminate) break;
 							}
 
 							if (exploreTerminate) break;
 						}
 
-						if (exploreTerminate || cnfstate == UNSAT) { lit = 0; continue; }
+						if (exploreTerminate || cnfstate == UNSAT) { lit = 0; break; }
 
 						// Compare the closures
 						uint32 i = 0, j = 0;

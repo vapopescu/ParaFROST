@@ -84,6 +84,7 @@ namespace pFROST {
 			PFLOG0("");
 		}
 		pfrost->interrupt();
+		pfrost->workerPool.interrupt();
 	}
 
 	void signal_handler(void h_intr(int))
