@@ -157,7 +157,10 @@ namespace pFROST {
 			return -1;
 		}
 
-		inline void interrupt() { _interrupted = true; }
+		inline void interrupt() { 
+			_interrupted = true;
+			_poolCV.notify_one();
+		}
 		inline bool isInterrupted() const { return _interrupted; }
 	};
 }
