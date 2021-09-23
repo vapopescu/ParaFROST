@@ -74,6 +74,7 @@ void ParaFROST::reduceOT()
 		uint32 p = V2L(v), n = NEG(p);
 		reduceOL(ot[p]);
 		reduceOL(ot[n]);
+		assert(checkDeleted(ot[p], ot[n]));
 	});
 	workerPool.join();
 

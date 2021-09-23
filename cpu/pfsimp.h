@@ -125,8 +125,8 @@ namespace SIGmA {
 	inline bool isTautology(const uint32& elim_v, const S_REF c1, const S_REF c2)
 	{
 		assert(elim_v > 0);
-		assert(!c1->deleted());
-		assert(!c2->deleted());
+		//assert(!c1->deleted());
+		//assert(!c2->deleted());
 		int it1 = 0, it2 = 0;
 		while (it1 < c1->size() && it2 < c2->size()) {
 			uint32 v1 = ABS(c1->lit(it1)), v2 = ABS(c2->lit(it2));
@@ -612,7 +612,7 @@ namespace SIGmA {
 			if (second < first) first = second, second = def;
 			for (int i = 0; i < negs.size(); i++) {
 				SCLAUSE& c = *negs[i];
-				if (c.learnt()) continue;
+				if (c.learnt() || c.deleted()) continue;
 				if (c.size() == 2 && c[0] == first && c[1] == second) {
 #if VE_DBG
 					PFLOG1(" Gate %d = -/+%d found", ABS(p), ABS(def));
@@ -633,7 +633,7 @@ namespace SIGmA {
 		uint32 imp = 0;
 		for (S_REF* i = list; i != list.end(); i++) {
 			SCLAUSE& c = **i;
-			if (c.learnt()) continue;
+			if (c.learnt() || c.deleted()) continue;
 			assert(!c.molten());
 			if (c.size() == 2) {
 				imp = FLIP(c[0] ^ c[1] ^ gate_out);
@@ -664,7 +664,7 @@ namespace SIGmA {
 			OL& otarget = ot[f_dx];
 			for (int i = 0; i < otarget.size(); i++) {
 				SCLAUSE& c = *otarget[i];
-				if (c.learnt()) continue;
+				if (c.learnt() || c.deleted()) continue;
 				if (c.size() == out_c.size() && subset_sig(c.sig(), sig) && isEqual(c, out_c)) {
 					c.melt(); // mark as fanout clause
 					// check resolvability
@@ -697,7 +697,7 @@ namespace SIGmA {
 		OL& itarget = ot[dx];
 		for (S_REF* i = itarget; i != itarget.end(); i++) {
 			SCLAUSE& ci = **i;
-			if (ci.learnt() || ci.size() < 3 || ci.size() > 3) continue;
+			if (ci.learnt() || ci.deleted() || ci.size() < 3 || ci.size() > 3) continue;
 			assert(ci.original());
 			uint32 xi = ci[0], yi = ci[1], zi = ci[2];
 			if (yi == dx) swap(xi, yi);
@@ -705,7 +705,7 @@ namespace SIGmA {
 			assert(xi == dx);
 			for (S_REF* j = i + 1; j != itarget.end(); j++) {
 				SCLAUSE& cj = **j;
-				if (cj.learnt() || cj.size() < 3 || cj.size() > 3) continue;
+				if (cj.learnt() || cj.deleted() || cj.size() < 3 || cj.size() > 3) continue;
 				assert(cj.original());
 				uint32 xj = cj[0], yj = cj[1], zj = cj[2];
 				if (yj == dx) swap(xj, yj);
@@ -754,7 +754,7 @@ namespace SIGmA {
 		OL& otarget = ot[fx];
 		for (S_REF* i = itarget; i != itarget.end(); i++) {
 			SCLAUSE& ci = **i;
-			if (ci.original()) {
+			if (ci.original() || ci.deleted()) {
 				const int size = ci.size();
 				const int arity = size - 1; // XOR arity
 				if (size < 3 || arity > pfrost->opts.xor_max_arity) continue;
@@ -819,9 +819,9 @@ namespace SIGmA {
 		pfrost->printOL(poss), pfrost->printOL(negs);
 #endif
 		for (int i = 0; i < poss.size(); i++) {
-			if (poss[i]->learnt()) continue;
+			if (poss[i]->learnt() || poss[i]->deleted()) continue;
 			for (int j = 0; j < negs.size(); j++) {
-				if (negs[j]->learnt()) continue;
+				if (negs[j]->learnt() || negs[j]->deleted()) continue;
 				if (!isTautology(x, poss[i], negs[j])) {
 					merge(x, poss[i], negs[j], out_c);
 					S_REF added = new SCLAUSE(out_c);
@@ -875,6 +875,7 @@ namespace SIGmA {
 	inline void self_sub_x(const uint32& p, OL& poss, OL& negs)
 	{
 		assert(checkMolten(poss, negs));
+		assert(checkDeleted(poss, negs));
 		for (int i = 0; i < poss.size(); i++) {
 			S_REF c = poss[i];
 			if (c->size() > HSE_MAX_CL_SIZE) break;
@@ -918,106 +919,6 @@ namespace SIGmA {
 	inline void flip_lits(uVec1D& lits) {
 		for (uint32 i = 0; i < lits.size(); i++) {
 			lits[i] = FLIP(lits[i]);
-		}
-	}
-
-	inline void clause_elim(S_REF& c, OT& ot, IG& ig)
-	{
-		// RSE
-		if (pfrost->opts.rse_en && !c->deleted() && c->size() <= pfrost->opts.rse_max) {
-			CNF_CMP_ABS less;
-			OL subsumed;
-			subsumed.reserve(INIT_CAP);
-
-			for (int k = 0; k < c->size(); k++) {
-				uint32 lit = c->lit(k);
-				OL& ol = ot[lit];
-				OL* candidates = nullptr;
-
-				if (pfrost->opts.hla_en) {
-					candidates = new OL();
-					candidates->copyFrom(ol);
-
-					for (uint32 i = 0; i < ig[lit].descendants().size(); i++) {
-						uint32 aug = ig[lit].descendants()[i];
-						if (subsumed.size() > 0) {
-							OL augOl;
-							augOl.copyFrom(subsumed);
-							augOl.intersect(ot[aug]);
-							candidates->unionize(augOl);
-						}
-						else {
-							candidates->unionize(ot[aug]);
-						}
-					}
-				}
-				else {
-					candidates = &ol;
-				}
-
-				if (k == 0) {
-					subsumed.copyFrom(*candidates);
-					if (!pfrost->opts.hla_en) {
-						int i = 0, n = 0;
-						while (i < subsumed.size()) {
-							S_REF& d = subsumed[i];
-							if (subset_sig(c->sig(), d->sig())) subsumed[n++] = subsumed[i];
-							i++;
-						}
-					}
-				}
-				else {
-					int i = 0, j = 0, n = 0;
-					while (i < subsumed.size() && j < candidates->size()) {
-						S_REF& d1 = subsumed[i], & d2 = (*candidates)[j];
-						if (d1->deleted() || less(d1, d2)) i++;
-						else if (d2->deleted() || less(d2, d1)) j++;
-						else if (d1 != c) { subsumed[n++] = subsumed[i++]; j++; }
-						else { i++; j++; }
-					}
-					subsumed.resize(n);
-				}
-
-				if (pfrost->opts.hla_en) {
-					delete candidates;
-				}
-
-				if (subsumed.empty()) break;
-			}
-
-			bool promote = false;
-			c->lock();
-			if (!c->deleted()) {
-				for (int i = 0; i < subsumed.size(); i++) {
-					S_REF d = subsumed[i];
-					if (d->tryLock()) {
-						if (!d->deleted()) {
-							if (d->original()) promote = true;
-							if (c->size() < d->size()) d->markDeleted();
-						}
-						d->unlock();
-					}
-				}
-			}
-			if (promote) c->set_status(ORIGINAL);
-			c->unlock();
-		}
-
-		// HSE
-		if (pfrost->opts.hse_en && !pfrost->opts.rse_en && !c->deleted() && c->size() > 2 && c->size() <= HSE_MAX_CL_SIZE) {
-			for (int k = 0; k < c->size() && !c->deleted(); k++) {
-				OL& ol = ot[c->lit(k)];
-				if (ol.size() <= pfrost->opts.hse_limit) sub_x(c, ol);
-			}
-		}
-
-		// BCE
-		if (pfrost->opts.bce_en && !c->deleted() && !c->learnt() && c->size() > 2) {
-			for (int k = 0; k < c->size() && !c->deleted(); k++) {
-				OL& ol = ot[FLIP(c->lit(k))];
-				if (ol.size() <= pfrost->opts.bce_limit && is_blocked_x(ABS(c->lit(k)), c, ol))
-					c->markDeleted();
-			}
 		}
 	}
 

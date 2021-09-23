@@ -419,7 +419,7 @@ void ParaFROST::IGR()
 					}
 
 					// Remove redundant edges.
-					/*for (uint32 i = 0; i < cs.size(); i++) {
+					for (uint32 i = 0; i < cs.size(); i++) {
 						if (!cs[i].second->deleted()) {
 							uint32 c = cs[i].first;
 							ig[c].lock();
@@ -435,7 +435,7 @@ void ParaFROST::IGR()
 
 							ig[c].unlock();
 						}
-					}*/
+					}
 
 					// Check if literal is failed.
 					bool failed = false;
@@ -642,6 +642,8 @@ void ParaFROST::IGR()
 		assert(ok);
 #endif
 
+		reduceOT();
+
 		PFLDONE(2, 5);
 		//PFLOG2(2, " Number of SCCs in IG is %d.", (uint32)sccCount);
 		PFLREDALL(this, 2, "IGR Reductions");
@@ -655,14 +657,120 @@ void ParaFROST::CE()
 		PFLOGN2(2, "  Eliminating clauses..");
 		if (opts.profile_simp) timer.pstart();
 
-		workerPool.doWorkForEach((size_t)0, scnf.size(), (size_t)64, [this](size_t i) {
-			clause_elim(scnf[i], ot, ig);
-		});
-		workerPool.join();
+		// RSE
+		if (pfrost->opts.rse_en) {
+			workerPool.doWorkForEach((size_t)0, scnf.size(), (size_t)64, [this](size_t i) {
+				S_REF c = scnf[i];
+				if (!c->deleted() && c->size() <= pfrost->opts.rse_max) {
+					CNF_CMP_ABS less;
+					OL subsumed;
+					subsumed.reserve(INIT_CAP);
+
+					for (int k = 0; k < c->size(); k++) {
+						uint32 lit = c->lit(k);
+						OL& ol = ot[lit];
+						OL* candidates = nullptr;
+
+						if (pfrost->opts.hla_en) {
+							candidates = new OL();
+							candidates->copyFrom(ol);
+
+							for (uint32 i = 0; i < ig[lit].descendants().size(); i++) {
+								uint32 aug = ig[lit].descendants()[i];
+								if (subsumed.size() > 0) {
+									OL augOl;
+									augOl.copyFrom(ot[aug]);
+									augOl.intersect(subsumed);
+									candidates->unionize(augOl);
+								}
+								else {
+									candidates->unionize(ot[aug]);
+								}
+							}
+						}
+						else {
+							candidates = &ol;
+						}
+
+						if (k == 0) {
+							subsumed.copyFrom(*candidates);
+							if (!pfrost->opts.hla_en) {
+								int i = 0, n = 0;
+								while (i < subsumed.size()) {
+									S_REF d = subsumed[i];
+									if (subset_sig(c->sig(), d->sig())) subsumed[n++] = subsumed[i];
+									i++;
+								}
+							}
+						}
+						else {
+							int i = 0, j = 0, n = 0;
+							while (i < subsumed.size() && j < candidates->size()) {
+								S_REF d1 = subsumed[i], & d2 = (*candidates)[j];
+								if (d1->deleted() || less(d1, d2)) i++;
+								else if (d2->deleted() || less(d2, d1)) j++;
+								else if (d1 != c) { subsumed[n++] = subsumed[i++]; j++; }
+								else { i++; j++; }
+							}
+							subsumed.resize(n);
+						}
+
+						if (pfrost->opts.hla_en) {
+							delete candidates;
+						}
+
+						if (subsumed.empty()) break;
+					}
+
+					bool promote = false;
+					c->lock();
+					if (!c->deleted()) {
+						for (int i = 0; i < subsumed.size(); i++) {
+							S_REF d = subsumed[i];
+							if (d->tryLock()) {
+								if (!d->deleted()) {
+									if (d->original()) promote = true;
+									if (c->size() < d->size()) d->markDeleted();
+								}
+								d->unlock();
+							}
+						}
+					}
+					if (promote) c->set_status(ORIGINAL);
+					c->unlock();
+				}
+			});
+			workerPool.join();
+		}
+
+		// HSE
+		if (pfrost->opts.hse_en && !pfrost->opts.rse_en) {
+			workerPool.doWorkForEach((size_t)0, scnf.size(), (size_t)64, [this](size_t i) {
+				S_REF c = scnf[i];
+				if (!c->deleted() && c->size() > 2 && c->size() <= HSE_MAX_CL_SIZE) {
+					for (int k = 0; k < c->size() && !c->deleted(); k++) {
+						OL& ol = ot[c->lit(k)];
+						if (ol.size() <= pfrost->opts.hse_limit) sub_x(c, ol);
+					}
+				}
+			});
+			workerPool.join();
+		}
+
+		// BCE
+		if (pfrost->opts.bce_en) {
+			workerPool.doWorkForEach((uint32)1, inf.maxVar, (uint32)64, [&](uint32 v) {
+				uint32 p = V2L(v), n = NEG(p);
+				if (ot[p].size() <= opts.bce_limit && ot[n].size() <= opts.bce_limit)
+					blocked_x(v, ot[n], ot[p]);
+			});
+			workerPool.join();
+		}
+
+		if (opts.profile_simp) timer.pstop(), timer.ce += timer.pcpuTime();
 
 		reduceOT();
 
-		if (opts.profile_simp) timer.pstop(), timer.ce += timer.pcpuTime();
 		PFLDONE(2, 5);
 		PFLREDALL(this, 2, "Clause Reductions");
 	}
