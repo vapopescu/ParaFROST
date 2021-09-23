@@ -40,7 +40,7 @@ void ParaFROST::createOT(const bool& rst)
 	// create ot
 	workerPool.doWorkForEach((size_t)0, scnf.size(), [&](size_t i) {
 		SCLAUSE& c = *scnf[i];
-		if (c.learnt() || c.original()) {
+		if (!c.deleted()) {
 			assert(c.size());
 			for (int k = 0; k < c.size(); k++) {
 				assert(c[k] > 1);
@@ -70,7 +70,7 @@ void ParaFROST::reduceOT()
 {
 	if (opts.profile_simp) timer.pstart();
 
-	workerPool.doWorkForEach((uint32)1, inf.maxVar, [&](uint32 v) {
+	workerPool.doWorkForEach((uint32)1, inf.maxVar + 1, [&](uint32 v) {
 		uint32 p = V2L(v), n = NEG(p);
 		reduceOL(ot[p]);
 		reduceOL(ot[n]);
@@ -86,7 +86,7 @@ void ParaFROST::sortOT(const bool& partial)
 	if (opts.profile_simp) timer.pstart();
 
 	if (!partial && opts.ce_en) {
-		workerPool.doWorkForEach((uint32)1, inf.maxVar, [this](uint32 v) {
+		workerPool.doWorkForEach((uint32)1, inf.maxVar + 1, [this](uint32 v) {
 			assert(v);
 			uint32 p = V2L(v), n = NEG(p);
 			OL& poss = ot[p], & negs = ot[n];

@@ -722,6 +722,7 @@ void ParaFROST::CE()
 						if (subsumed.empty()) break;
 					}
 
+					// TODO: Remove locks.
 					bool promote = false;
 					c->lock();
 					if (!c->deleted()) {
@@ -759,7 +760,7 @@ void ParaFROST::CE()
 
 		// BCE
 		if (pfrost->opts.bce_en) {
-			workerPool.doWorkForEach((uint32)1, inf.maxVar, (uint32)64, [&](uint32 v) {
+			workerPool.doWorkForEach((uint32)1, inf.maxVar + 1, (uint32)64, [&](uint32 v) {
 				uint32 p = V2L(v), n = NEG(p);
 				if (ot[p].size() <= opts.bce_limit && ot[n].size() <= opts.bce_limit)
 					blocked_x(v, ot[n], ot[p]);

@@ -238,12 +238,12 @@ namespace SIGmA {
 		// substitute negatives 
 		uint32 n = NEG(p);
 		for (int i = 0; i < negs.size(); i++) {
-			if (negs[i]->learnt() || negs[i]->has(def)) negs[i]->markDeleted(); // learnt or tautology
+			if (!negs[i]->original() || negs[i]->has(def)) negs[i]->markDeleted(); // learnt or tautology
 			else substitute_single(n, *negs[i], FLIP(def));
 		}
 		// substitute positives
 		for (int i = 0; i < poss.size(); i++) {
-			if (poss[i]->learnt() || poss[i]->has(FLIP(def))) poss[i]->markDeleted();
+			if (!poss[i]->original() || poss[i]->has(FLIP(def))) poss[i]->markDeleted();
 			else substitute_single(p, *poss[i], def);
 		}
 	}
@@ -253,9 +253,9 @@ namespace SIGmA {
 		assert(x);
 		out_c.clear();
 		for (int i = 0; i < poss.size(); i++) {
-			if (poss[i]->learnt()) continue;
+			if (!poss[i]->original()) continue;
 			for (int j = 0; j < negs.size(); j++) {
-				if (negs[j]->learnt()) continue;
+				if (!negs[j]->original()) continue;
 				bool a = poss[i]->molten(), b = negs[j]->molten();
 				if (a != b && !isTautology(x, poss[i], negs[j])) {
 					merge(x, poss[i], negs[j], out_c);
@@ -495,9 +495,9 @@ namespace SIGmA {
 	inline void countSubstituted(const uint32& x, OL& me, OL& other, int& nAddedCls, int& nAddedLits)
 	{
 		for (int i = 0; i < me.size(); i++) {
-			if (me[i]->learnt()) continue;
+			if (!me[i]->original()) continue;
 			for (int j = 0; j < other.size(); j++) {
-				if (other[j]->learnt()) continue;
+				if (!other[j]->original()) continue;
 				bool a = me[i]->molten(), b = other[j]->molten();
 				if (a != b && !isTautology(x, me[i], other[j]))
 					nAddedCls++, nAddedLits += me[i]->size() + other[j]->size() - 2;
@@ -508,9 +508,9 @@ namespace SIGmA {
 	inline void countSubstituted(const uint32& x, OL& me, OL& other, int& nAddedCls)
 	{
 		for (int i = 0; i < me.size(); i++) {
-			if (me[i]->learnt()) continue;
+			if (!me[i]->original()) continue;
 			for (int j = 0; j < other.size(); j++) {
-				if (other[j]->learnt()) continue;
+				if (!other[j]->original()) continue;
 				bool a = me[i]->molten(), b = other[j]->molten();
 				if (a != b && !isTautology(x, me[i], other[j]))
 					nAddedCls++;
@@ -522,9 +522,9 @@ namespace SIGmA {
 	{
 		int nTs = 0;
 		for (int i = 0; i < poss.size(); i++) {
-			if (poss[i]->learnt()) continue;
+			if (!poss[i]->original()) continue;
 			for (int j = 0; j < negs.size(); j++) {
-				if (negs[j]->learnt()) continue;
+				if (!negs[j]->original()) continue;
 				if (isTautology(x, poss[i], negs[j])) nTs++;
 				else nAddedLits += poss[i]->size() + negs[j]->size() - 2;
 			}
@@ -612,7 +612,7 @@ namespace SIGmA {
 			if (second < first) first = second, second = def;
 			for (int i = 0; i < negs.size(); i++) {
 				SCLAUSE& c = *negs[i];
-				if (c.learnt() || c.deleted()) continue;
+				if (!c.original()) continue;
 				if (c.size() == 2 && c[0] == first && c[1] == second) {
 #if VE_DBG
 					PFLOG1(" Gate %d = -/+%d found", ABS(p), ABS(def));
@@ -633,7 +633,7 @@ namespace SIGmA {
 		uint32 imp = 0;
 		for (S_REF* i = list; i != list.end(); i++) {
 			SCLAUSE& c = **i;
-			if (c.learnt() || c.deleted()) continue;
+			if (!c.original()) continue;
 			assert(!c.molten());
 			if (c.size() == 2) {
 				imp = FLIP(c[0] ^ c[1] ^ gate_out);
@@ -664,7 +664,7 @@ namespace SIGmA {
 			OL& otarget = ot[f_dx];
 			for (int i = 0; i < otarget.size(); i++) {
 				SCLAUSE& c = *otarget[i];
-				if (c.learnt() || c.deleted()) continue;
+				if (!c.original()) continue;
 				if (c.size() == out_c.size() && subset_sig(c.sig(), sig) && isEqual(c, out_c)) {
 					c.melt(); // mark as fanout clause
 					// check resolvability
@@ -697,7 +697,7 @@ namespace SIGmA {
 		OL& itarget = ot[dx];
 		for (S_REF* i = itarget; i != itarget.end(); i++) {
 			SCLAUSE& ci = **i;
-			if (ci.learnt() || ci.deleted() || ci.size() < 3 || ci.size() > 3) continue;
+			if (!ci.original() || ci.size() < 3 || ci.size() > 3) continue;
 			assert(ci.original());
 			uint32 xi = ci[0], yi = ci[1], zi = ci[2];
 			if (yi == dx) swap(xi, yi);
@@ -705,7 +705,7 @@ namespace SIGmA {
 			assert(xi == dx);
 			for (S_REF* j = i + 1; j != itarget.end(); j++) {
 				SCLAUSE& cj = **j;
-				if (cj.learnt() || cj.deleted() || cj.size() < 3 || cj.size() > 3) continue;
+				if (!cj.original() || cj.size() < 3 || cj.size() > 3) continue;
 				assert(cj.original());
 				uint32 xj = cj[0], yj = cj[1], zj = cj[2];
 				if (yj == dx) swap(xj, yj);
@@ -819,9 +819,9 @@ namespace SIGmA {
 		pfrost->printOL(poss), pfrost->printOL(negs);
 #endif
 		for (int i = 0; i < poss.size(); i++) {
-			if (poss[i]->learnt() || poss[i]->deleted()) continue;
+			if (!poss[i]->original()) continue;
 			for (int j = 0; j < negs.size(); j++) {
-				if (negs[j]->learnt() || negs[j]->deleted()) continue;
+				if (!negs[j]->original()) continue;
 				if (!isTautology(x, poss[i], negs[j])) {
 					merge(x, poss[i], negs[j], out_c);
 					S_REF added = new SCLAUSE(out_c);
@@ -901,7 +901,7 @@ namespace SIGmA {
 		bool allTautology = true;
 		for (int j = 0; j < other.size(); j++) {
 			S_REF d = other[j];
-			if (d->deleted() || d->learnt()) continue;
+			if (!d->original()) continue;
 			if (!isTautology(x, c, d)) { allTautology = false; break; }
 		}
 		return allTautology;
@@ -911,7 +911,7 @@ namespace SIGmA {
 	{
 		for (int i = 0; i < me.size(); i++) {
 			S_REF c = me[i];
-			if (c->deleted() || c->learnt()) continue;
+			if (!c->original()) continue;
 			if (is_blocked_x(x, c, other)) c->markDeleted();;
 		}
 	}

@@ -525,7 +525,7 @@ namespace pFROST {
 				uint32 end = begin + batchSize + (tid < remainder ? 1 : 0);
 				
 				for (uint32 i = begin; i < end; i++) {
-					if (scnf[i]->original() || scnf[i]->learnt()) {
+					if (!scnf[i]->deleted()) {
 						c++;
 						l += scnf[i]->size();
 					}
@@ -542,20 +542,20 @@ namespace pFROST {
 		inline void		countCls			() {
 			inf.n_cls_after = 0;
 			for (uint32 i = 0; i < scnf.size(); i++)
-				if (scnf[i]->original() || scnf[i]->learnt())
+				if (!scnf[i]->deleted())
 					inf.n_cls_after++;
 		}
 		inline void		countLits			() {
 			inf.n_lits_after = 0;
 			for (uint32 i = 0; i < scnf.size(); i++)
-				if (scnf[i]->original() || scnf[i]->learnt())
+				if (!scnf[i]->deleted())
 					inf.n_lits_after += scnf[i]->size();
 		}
 		inline void		evalReds			() {
 			inf.n_cls_after = 0;
 			inf.n_lits_after = 0;
 			for (uint32 i = 0; i < scnf.size(); i++) {
-				if (scnf[i]->original() || scnf[i]->learnt()) {
+				if (!scnf[i]->deleted()) {
 					inf.n_cls_after++;
 					inf.n_lits_after += scnf[i]->size();
 				}
