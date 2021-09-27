@@ -418,24 +418,24 @@ void ParaFROST::IGR()
 						}
 					}
 
-					// Remove redundant edges.
-					for (uint32 i = 0; i < cs.size(); i++) {
-						if (!cs[i].second->deleted()) {
-							uint32 c = cs[i].first;
-							ig[c].lock();
+					//// Remove redundant edges.
+					//for (uint32 i = 0; i < cs.size(); i++) {
+					//	if (!cs[i].second->deleted()) {
+					//		uint32 c = cs[i].first;
+					//		ig[c].lock();
 
-							for (uint32 j = 0; j < ds.size(); j++) {
-								if (ds[j] < c) continue;
-								else if (ds[j] == c) {
-									cs[i].second->markDeleted();
-									break;
-								}
-								else break;
-							}
+					//		for (uint32 j = 0; j < ds.size(); j++) {
+					//			if (ds[j] < c) continue;
+					//			else if (ds[j] == c) {
+					//				cs[i].second->markDeleted();
+					//				break;
+					//			}
+					//			else break;
+					//		}
 
-							ig[c].unlock();
-						}
-					}
+					//		ig[c].unlock();
+					//	}
+					//}
 
 					// Check if literal is failed.
 					bool failed = false;
