@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "pfsimp.h"
 #include <cmath>
+#include <mutex>
 
 using namespace pFROST;
 using namespace SIGmA;
@@ -26,6 +27,8 @@ void ParaFROST::createOT(const bool& rst)
 {
 	if (opts.profile_simp) timer.pstart();
 
+	std::mutex m;
+
 	// reset ot
 	if (rst) {
 		workerPool.doWorkForEach((uint32)1, inf.maxVar + 1, [&](uint32 i) {
@@ -33,7 +36,6 @@ void ParaFROST::createOT(const bool& rst)
 			ot[p].clear();
 			ot[NEG(p)].clear();
 		});
-
 		workerPool.join();
 	}
 
@@ -48,10 +50,36 @@ void ParaFROST::createOT(const bool& rst)
 				ot[c[k]].push(scnf[i]);
 				ot[c[k]].unlock();
 			}
+
+			if (c.size() == 1) {
+				uint32 unit = c.lit(0);
+				{
+					std::unique_lock lock(m);
+					if (unassigned(unit)) enqueueOrg(unit);
+					else if (isFalse(unit)) cnfstate = UNSAT;
+				}
+			}
 		}
 	});
-
 	workerPool.join();
+
+	// check pure literals
+	workerPool.doWorkForEach((uint32)1, inf.maxVar + 1, [&](uint32 i) {
+		uint32 p = V2L(i);
+		uint32 n = NEG(p);
+		uint32 pure = 0;
+
+		if (ot[p].size() == 0 && ot[n].size() > 0) pure = n;
+		else if (ot[n].size() == 0 && ot[p].size() > 0) pure = p;
+
+		if (pure > 1) {
+			std::unique_lock lock(m);
+			if (unassigned(pure)) enqueueOrg(pure);
+			else if (isFalse(pure)) cnfstate = UNSAT;
+		}
+	});
+	workerPool.join();
+
 	if (opts.profile_simp) timer.pstop(), timer.cot += timer.pcpuTime();
 }
 
@@ -181,9 +209,11 @@ void ParaFROST::sigmify()
 			// Stage 1
 			resizeCNF();
 			createOT();
+			if (cnfstate == UNSAT) break;
+
 			int p = prop();
 			if (p > 0) { PFLREDALL(this, 2, "BCP Reductions"); }
-			else if (p < 0) break;
+			if (cnfstate == UNSAT) break;
 
 			// Stage 2
 			IGR();

@@ -32,7 +32,7 @@ int ParaFROST::prop(SCNF* bin_check)
 		uint32 assign = 0;
 		while (cnfstate == UNSOLVED) {
 			{
-				std::unique_lock<std::mutex> lock(m);
+				std::unique_lock lock(m);
 				working--;
 
 				while (sp->propagated == trail.size()) {
@@ -108,16 +108,26 @@ void ParaFROST::IGR()
 		PFLOGN2(2, " Reasoning on the implication graph..");
 		if (opts.profile_simp) timer.pstart();
 
-		// Initialize IG based on original binary clauses.
-		workerPool.doWorkForEach((size_t)0, scnf.size(), [this](size_t i) {
+		std::mutex propagateMutex;
+
+		// Initialize IG based on original binary clauses. Check for unit clauses as well.
+		workerPool.doWorkForEach((size_t)0, scnf.size(), [&](size_t i) {
 			S_REF c = scnf[i];
-			if (c->size() == 2 && c->original() && !c->deleted()) append_ig_edge(c, ig);
+			if (c->size() == 1) {
+				uint32 unit = c->lit(0);
+				{
+					std::unique_lock lock(propagateMutex);
+					if (unassigned(unit)) enqueueOrg(unit);
+					else if (isFalse(unit)) cnfstate = UNSAT;
+				}
+			}
+			else if (c->size() == 2 && c->original() && !c->deleted()) append_ig_edge(c, ig);
 		});
 		workerPool.join();
 
 		if (opts.profile_simp) timer.pstop(), timer.igr += timer.pcpuTime(), timer.igr_part[0] += timer.pcpuTime();
 
-		workerPool.doWorkForEach((uint32)0, ig.size(), [this](uint32 i) {
+		workerPool.doWorkForEach((uint32)0, ig.size(), [&](uint32 i) {
 			ig[i].sortEdges();
 		});
 		workerPool.join();
@@ -136,7 +146,6 @@ void ParaFROST::IGR()
 			if (opts.profile_simp) timer.pstart();
 
 			// Propagate boolean constraints
-			std::mutex propagateMutex;
 			SCNF bin_check;
 			bin_check.reserve(INIT_CAP);
 
@@ -971,12 +980,12 @@ bool ParaFROST::propClause(S_REF c, const uint32& f_assign)
 		}
 		else check = true;
 	}
-	assert(check);
-	assert(n == c->size() - 1);
+	// assert(check);
+	// assert(n == c->size() - 1);
 	assert(c->hasZero() < 0);
 	assert(c->isSorted());
 	c->set_sig(sig);
-	c->pop();
+	c->resize(n);
 	return false;
 }
 
